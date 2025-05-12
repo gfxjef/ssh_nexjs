@@ -64,6 +64,17 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [postsDestacados.length]);
 
+  // Log para depurar las imágenes destacadas
+  useEffect(() => {
+    if (postsDestacados.length > 0 && !loading) {
+      console.log('Imágenes destacadas:', postsDestacados.map(post => ({
+        id: post.id,
+        titulo: post.titulo,
+        imagenUrl: post.imagenUrl
+      })));
+    }
+  }, [postsDestacados, loading]);
+
   // Formatear fecha para mostrar
   const formatearFecha = (fechaString: string) => {
     const fecha = new Date(fechaString);
@@ -149,13 +160,24 @@ export default function Dashboard() {
           >
             {/* Imagen de fondo si existe */}
             {postsDestacados[activeSlide].imagenUrl ? (
-              <div 
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${postsDestacados[activeSlide].imagenUrl})` }}
-              >
-                {/* Gradiente oscuro para mejorar legibilidad del texto */}
-                <div className="absolute inset-0 bg-black bg-opacity-30"></div>
-              </div>
+              <>
+                {/* Imagen con gestión de errores */}
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-r from-[#2e3954] to-[#3a4665]">
+                  <img
+                    src={postsDestacados[activeSlide].imagenUrl}
+                    alt={postsDestacados[activeSlide].titulo}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Error al cargar la imagen:', postsDestacados[activeSlide].imagenUrl);
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+
+                {/* Overlay más sutil */}
+                <div className="absolute inset-0 bg-black bg-opacity-20 pointer-events-none"></div>
+              </>
             ) : (
               <div className="absolute inset-0 bg-gradient-to-r from-[#2e3954] to-[#3a4665]"></div>
             )}
@@ -183,6 +205,26 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+            
+            {/* Indicadores del slider - Solo si hay más de un post destacado */}
+            {postsDestacados.length > 1 && (
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3">
+                {postsDestacados.map((_, index) => (
+                  <button 
+                    key={index}
+                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                      activeSlide === index 
+                        ? 'bg-[#d48b45] scale-125 shadow-lg' 
+                        : 'bg-white bg-opacity-50 hover:bg-opacity-75'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSlideChange(index);
+                    }}
+                  ></button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-gradient-to-r from-[#2e3954] to-[#3a4665] relative h-96 flex items-center justify-center">

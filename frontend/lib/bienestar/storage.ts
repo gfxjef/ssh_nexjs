@@ -32,7 +32,7 @@ const initialPosts: Post[] = [
     vistas: 1240,
     estado: 'publicado',
     destacado: true,
-    imagenUrl: '/images/blog/auth-nextjs.jpg'
+    imagenUrl: '/grupokossodo_logo.webp'
   },
   {
     id: 2,
@@ -46,7 +46,7 @@ const initialPosts: Post[] = [
     vistas: 985,
     estado: 'publicado',
     destacado: false,
-    imagenUrl: '/images/blog/react-hooks.jpg'
+    imagenUrl: '/grupokossodo_blanco.png'
   },
   {
     id: 3,
@@ -60,7 +60,7 @@ const initialPosts: Post[] = [
     vistas: 762,
     estado: 'borrador',
     destacado: false,
-    imagenUrl: '/images/blog/ui-ux-design.jpg'
+    imagenUrl: ''
   },
   {
     id: 4,
@@ -74,7 +74,7 @@ const initialPosts: Post[] = [
     vistas: 542,
     estado: 'publicado',
     destacado: false,
-    imagenUrl: '/images/blog/ergonomics.jpg'
+    imagenUrl: ''
   },
   {
     id: 5,
@@ -88,7 +88,7 @@ const initialPosts: Post[] = [
     vistas: 1576,
     estado: 'borrador',
     destacado: true,
-    imagenUrl: '/images/blog/nextjs-13.jpg'
+    imagenUrl: ''
   },
   {
     id: 6,
@@ -102,7 +102,7 @@ const initialPosts: Post[] = [
     vistas: 892,
     estado: 'archivado',
     destacado: false,
-    imagenUrl: '/images/blog/testing.jpg'
+    imagenUrl: ''
   }
 ];
 
