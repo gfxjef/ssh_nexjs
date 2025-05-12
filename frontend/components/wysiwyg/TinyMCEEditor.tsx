@@ -18,6 +18,7 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
   const initialValueSet = useRef(false);
   const lastKnownValueRef = useRef(value);
   const initialValueRef = useRef(value);
+  const editorFocused = useRef(false); // Referencia para rastrear si el editor tiene el foco
   
   // Solo capturamos el valor inicial una vez
   useEffect(() => {
@@ -62,6 +63,17 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
     lastKnownValueRef.current = initialContent;
     console.log("Inicializando editor con contenido:", initialContent.substring(0, Math.min(50, initialContent.length)) + (initialContent.length > 50 ? "..." : ""));
     
+    // Detectar cuando el editor gana o pierde el foco
+    editor.on('focus', () => {
+      editorFocused.current = true;
+      console.log("Editor ha ganado el foco");
+    });
+    
+    editor.on('blur', () => {
+      editorFocused.current = false;
+      console.log("Editor ha perdido el foco");
+    });
+    
     // Añadimos un manejador de eventos para detectar cambios en el contenido
     editor.on('Change KeyUp Undo Redo', () => {
       const newContent = editor.getContent();
@@ -77,7 +89,8 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
       <Editor
         apiKey="6zroariyyi687yb34ckq1xmh0udodac6ri1yv7r2sjw5g6kf"
         onInit={handleEditorInit}
-        // Eliminamos initialValue para evitar conflictos con nuestro enfoque no controlado
+        // Añadimos initialValue de vuelta para la carga inicial correcta
+        initialValue={value}
         init={{
           height: 350,
           menubar: false,
@@ -107,12 +120,14 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
           setup: (editor: any) => {
             // Desactivar cualquier evento que pueda reiniciar el cursor
             editor.on('BeforeSetContent', (e: any) => {
-              // Solo permitir establecer contenido durante la inicialización
+              // Siempre permitir establecer contenido durante la inicialización
               if (!initialValueSet.current) {
                 return;
               }
-              // Prevenir actualizaciones externas mientras el editor tiene el foco
-              if (editor.hasFocus()) {
+              
+              // Bloquear actualizaciones de contenido SOLO cuando el editor tiene foco
+              // Esto previene que el cursor salte al inicio mientras se escribe
+              if (editorFocused.current) {
                 e.preventDefault();
                 return false;
               }
