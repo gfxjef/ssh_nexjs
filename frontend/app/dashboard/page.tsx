@@ -144,21 +144,30 @@ export default function Dashboard() {
           </div>
         ) : postsDestacados.length > 0 ? (
           <div 
-            className="bg-gradient-to-r from-[#2e3954] to-[#3a4665] relative h-96 cursor-pointer"
+            className="relative h-96 cursor-pointer"
             onClick={() => handlePostClick(postsDestacados[activeSlide].id)}
           >
             {/* Imagen de fondo si existe */}
-            {postsDestacados[activeSlide].imagenUrl && (
+            {postsDestacados[activeSlide].imagenUrl ? (
               <div 
                 className="absolute inset-0 bg-cover bg-center"
                 style={{ backgroundImage: `url(${postsDestacados[activeSlide].imagenUrl})` }}
-              ></div>
+              >
+                {/* Gradiente oscuro para mejorar legibilidad del texto */}
+                <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-r from-[#2e3954] to-[#3a4665]"></div>
             )}
             
-            {/* Decoración visual */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full translate-y-1/4 -translate-x-1/4"></div>
-            
+            {/* Decoración visual solo cuando no hay imagen */}
+            {!postsDestacados[activeSlide].imagenUrl && (
+              <>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full translate-y-1/4 -translate-x-1/4"></div>
+              </>
+            )}
+          
             {/* Contenido del post destacado - simplificado */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center max-w-2xl px-6 z-10">
@@ -174,34 +183,14 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-            
-            {/* Indicadores del slider - Solo si hay más de un post destacado */}
-            {postsDestacados.length > 1 && (
-              <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3">
-                {postsDestacados.map((_, index) => (
-                  <button 
-                    key={index}
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      activeSlide === index 
-                        ? 'bg-[#d48b45] scale-125 shadow-lg' 
-                        : 'bg-white bg-opacity-50 hover:bg-opacity-75'
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSlideChange(index);
-                    }}
-                  ></button>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <div className="bg-gradient-to-r from-[#2e3954] to-[#3a4665] relative h-96 flex items-center justify-center">
             <div className="text-center max-w-2xl px-6 z-10">
               <h2 className="text-4xl font-extrabold mb-3 text-white drop-shadow-md">No hay posts destacados</h2>
               <p className="text-lg mb-6 text-white opacity-90">Marca un post como destacado para que aparezca aquí</p>
-            </div>
           </div>
+        </div>
         )}
       </div>
       
@@ -226,7 +215,7 @@ export default function Dashboard() {
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#2e3954] border-t-[#d48b45]"></div>
-          </div>
+            </div>
         ) : postsRecientes.length === 0 ? (
           <div className="text-center py-10">
             <p className="text-gray-500">No hay publicaciones recientes disponibles.</p>
@@ -234,15 +223,15 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {postsRecientes.map((post, index) => (
-              <div 
+          <div 
                 key={post.id}
-                className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
+            className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
                   hoveredCard === index 
-                    ? 'transform -translate-y-2 shadow-xl shadow-[#2e3954]/10' 
-                    : 'hover:shadow-lg'
-                }`}
+                ? 'transform -translate-y-2 shadow-xl shadow-[#2e3954]/10' 
+                : 'hover:shadow-lg'
+            }`}
                 onMouseEnter={() => setHoveredCard(index)}
-                onMouseLeave={() => setHoveredCard(null)}
+            onMouseLeave={() => setHoveredCard(null)}
                 onClick={() => handlePostClick(post.id)}
               >
                 {post.imagenUrl && (
@@ -251,14 +240,14 @@ export default function Dashboard() {
                       className="absolute inset-0 bg-cover bg-center"
                       style={{ backgroundImage: `url(${post.imagenUrl})` }}
                     ></div>
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-30"></div>
-                  </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black opacity-30"></div>
+            </div>
                 )}
-                <div className="p-6">
-                  <div className="text-sm text-[#d48b45] mb-2 font-medium flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+            <div className="p-6">
+              <div className="text-sm text-[#d48b45] mb-2 font-medium flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                     {formatearFecha(post.fecha)}
                   </div>
                   
@@ -267,25 +256,25 @@ export default function Dashboard() {
                       category={post.categoria}
                       color={categories.find(c => c.id === post.categoriaId)?.color}
                     />
-                  </div>
+              </div>
                   
                   <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-2">{post.titulo}</h3>
                   <p className="text-gray-600 mb-4 line-clamp-3">{post.extracto}</p>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">Por {post.autor}</span>
-                    <button 
-                      className="text-[#2e3954] font-medium hover:text-[#d48b45] transition-colors duration-300 inline-flex items-center group"
+              <button 
+                className="text-[#2e3954] font-medium hover:text-[#d48b45] transition-colors duration-300 inline-flex items-center group"
                       onClick={(e) => {
                         e.stopPropagation();
                         handlePostClick(post.id);
                       }}
-                    >
-                      Leer artículo 
-                      <span className="transform transition-transform duration-300 group-hover:translate-x-1">→</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+              >
+                Leer artículo 
+                <span className="transform transition-transform duration-300 group-hover:translate-x-1">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
             ))}
           </div>
         )}
