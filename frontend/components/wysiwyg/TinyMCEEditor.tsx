@@ -17,12 +17,23 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
   const editorRef = useRef<any>(null);
   const isInitialMount = useRef(true);
   const lastKnownValueRef = useRef(value);
+  const initialValueRef = useRef(value); // Nueva referencia para guardar el valor inicial
+
+  // Añadimos un efecto específico para registrar el valor inicial recibido
+  useEffect(() => {
+    console.log("TinyMCEEditor recibió value:", value ? (value.substring(0, 50) + "...") : "empty");
+    // Actualizar la referencia inicial solo en el primer render o cuando cambia de forma significativa
+    if (isInitialMount.current || (value && value !== initialValueRef.current)) {
+      initialValueRef.current = value;
+    }
+  }, [value]);
 
   // Solo actualizamos el contenido desde props cuando el valor cambia externamente
   // y no por edición interna del usuario
   useEffect(() => {
-    // Saltamos la primera ejecución
+    // Si es el primer renderizado, solo actualizamos la referencia del valor inicial
     if (isInitialMount.current) {
+      initialValueRef.current = value;
       isInitialMount.current = false;
       return;
     }
@@ -72,10 +83,13 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
   const handleEditorInit = (evt: any, editor: any) => {
     editorRef.current = editor;
     
-    // Establecemos el valor inicial solo durante la inicialización
-    if (value) {
-      editor.setContent(value);
-      lastKnownValueRef.current = value;
+    // Establecemos el valor inicial usando la referencia guardada
+    // esto asegura que usemos el valor disponible cuando el editor está listo
+    const initialContent = initialValueRef.current;
+    if (initialContent) {
+      editor.setContent(initialContent);
+      lastKnownValueRef.current = initialContent;
+      console.log("Inicializando editor con contenido:", initialContent.substring(0, 50) + "...");
     }
     
     // Añadimos un manejador de eventos para detectar cambios en el contenido
@@ -93,6 +107,7 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
       <Editor
         apiKey="6zroariyyi687yb34ckq1xmh0udodac6ri1yv7r2sjw5g6kf"
         onInit={handleEditorInit}
+        initialValue={value} /* Agregamos initialValue como propiedad explícita */
         init={{
           height: 350,
           menubar: false,

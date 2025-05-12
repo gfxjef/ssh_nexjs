@@ -37,7 +37,10 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
     if (isEditMode && post) {
       setTitulo(post.titulo);
       setExtracto(post.extracto);
-      setContenido(post.contenido || '');
+      // Asegurarse de que el contenido se maneje adecuadamente, incluso si es null o undefined
+      const postContent = post.contenido || '';
+      console.log("Cargando contenido del post para edición:", postContent.substring(0, 50) + (postContent.length > 50 ? "..." : ""));
+      setContenido(postContent);
       setCategoriaId(post.categoriaId);
       setAutor(post.autor);
       setFecha(post.fecha);
