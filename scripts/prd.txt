@@ -1,0 +1,39 @@
+# Product Requirements Document
+
+## Project Overview
+A web application with Next.js frontend and Python Flask backend with Kafka integration. The frontend will use Tailwind CSS for styling and will include a login page and a simple SPA structure with sidebar, header, and main content.
+
+## Requirements
+
+### Frontend (Next.js + Tailwind CSS)
+1. Create a login page with username and password fields
+2. Implement a simple SPA structure with:
+   - Sidebar navigation
+   - Header with user information and logout button
+   - Main content area
+3. Use Tailwind CSS exclusively for styling
+4. Implement authentication with JWT tokens
+5. Create responsive design that works on mobile and desktop
+6. Connect to backend API for data
+
+### Backend (Python + Flask + Kafka)
+1. Implement RESTful API endpoints
+2. Create user authentication system with JWT
+3. Set up Kafka producer/consumer for message processing
+4. Implement CORS to allow frontend connections
+5. Create database connection (use SQLite for simplicity)
+6. Implement proper error handling and logging
+
+### Integration
+1. Connect frontend to backend API
+2. Implement secure communication between services
+3. Use Context 7 MCP for documentation management
+
+## Technical Specifications
+- Next.js for frontend
+- Tailwind CSS for styling
+- Python Flask for backend API
+- Kafka for message processing
+- JWT for authentication
+- SQLite for database (for simplicity)
+- Context 7 MCP for documentation
