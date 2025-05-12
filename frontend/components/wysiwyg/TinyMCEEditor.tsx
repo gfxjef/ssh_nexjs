@@ -11,47 +11,20 @@ interface TinyMCEEditorProps {
 
 /**
  * Componente de editor TinyMCE con soporte para carga de imágenes
- * Implementado con enfoque no controlado para evitar problemas de cursor
+ * Implementado con enfoque completamente no controlado para solucionar problemas de cursor
  */
 export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe aquí...' }: TinyMCEEditorProps) {
   const editorRef = useRef<any>(null);
-  const isInitialMount = useRef(true);
+  const initialValueSet = useRef(false);
   const lastKnownValueRef = useRef(value);
-  const initialValueRef = useRef(value); // Nueva referencia para guardar el valor inicial
-
-  // Añadimos un efecto específico para registrar el valor inicial recibido
+  const initialValueRef = useRef(value);
+  
+  // Solo capturamos el valor inicial una vez
   useEffect(() => {
-    console.log("TinyMCEEditor recibió value:", value ? (value.substring(0, 50) + "...") : "empty");
-    // Actualizar la referencia inicial solo en el primer render o cuando cambia de forma significativa
-    if (isInitialMount.current || (value && value !== initialValueRef.current)) {
+    if (!initialValueSet.current) {
+      console.log("TinyMCEEditor valor inicial capturado:", value ? (value.substring(0, 50) + "...") : "empty");
       initialValueRef.current = value;
-    }
-  }, [value]);
-
-  // Solo actualizamos el contenido desde props cuando el valor cambia externamente
-  // y no por edición interna del usuario
-  useEffect(() => {
-    // Si es el primer renderizado, solo actualizamos la referencia del valor inicial
-    if (isInitialMount.current) {
-      initialValueRef.current = value;
-      isInitialMount.current = false;
-      return;
-    }
-
-    // Solo actualizamos si el valor externo es diferente al último valor que procesamos
-    if (editorRef.current && value !== lastKnownValueRef.current) {
-      // Guardamos la selección actual
-      const editor = editorRef.current;
-      const bookmarkId = editor.selection.getBookmark(2, true);
-      
-      // Actualizamos el contenido
-      editor.setContent(value);
-      
-      // Restauramos la selección
-      editor.selection.moveToBookmark(bookmarkId);
-      
-      // Actualizamos la referencia del último valor conocido
-      lastKnownValueRef.current = value;
+      initialValueSet.current = true;
     }
   }, [value]);
 
@@ -83,14 +56,11 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
   const handleEditorInit = (evt: any, editor: any) => {
     editorRef.current = editor;
     
-    // Establecemos el valor inicial usando la referencia guardada
-    // esto asegura que usemos el valor disponible cuando el editor está listo
-    const initialContent = initialValueRef.current;
-    if (initialContent) {
-      editor.setContent(initialContent);
-      lastKnownValueRef.current = initialContent;
-      console.log("Inicializando editor con contenido:", initialContent.substring(0, 50) + "...");
-    }
+    // Establecemos el valor inicial solo una vez cuando el editor está listo
+    const initialContent = initialValueRef.current || '';
+    editor.setContent(initialContent);
+    lastKnownValueRef.current = initialContent;
+    console.log("Inicializando editor con contenido:", initialContent.substring(0, Math.min(50, initialContent.length)) + (initialContent.length > 50 ? "..." : ""));
     
     // Añadimos un manejador de eventos para detectar cambios en el contenido
     editor.on('Change KeyUp Undo Redo', () => {
@@ -107,7 +77,7 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
       <Editor
         apiKey="6zroariyyi687yb34ckq1xmh0udodac6ri1yv7r2sjw5g6kf"
         onInit={handleEditorInit}
-        initialValue={value} /* Agregamos initialValue como propiedad explícita */
+        // Eliminamos initialValue para evitar conflictos con nuestro enfoque no controlado
         init={{
           height: 350,
           menubar: false,
@@ -133,8 +103,21 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
           convert_urls: false,
           relative_urls: false,
           browser_spellcheck: true,
-          // Mejoras de rendimiento
-          cache_suffix: '?v=' + new Date().getTime()
+          // Eliminamos el cache_suffix para evitar reinicios
+          setup: (editor: any) => {
+            // Desactivar cualquier evento que pueda reiniciar el cursor
+            editor.on('BeforeSetContent', (e: any) => {
+              // Solo permitir establecer contenido durante la inicialización
+              if (!initialValueSet.current) {
+                return;
+              }
+              // Prevenir actualizaciones externas mientras el editor tiene el foco
+              if (editor.hasFocus()) {
+                e.preventDefault();
+                return false;
+              }
+            });
+          }
         }}
       />
       <style jsx global>{`
