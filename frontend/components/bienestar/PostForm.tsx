@@ -133,6 +133,46 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
     setContenido(value);
   };
 
+  // Función para manejar la subida de imágenes
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Mostrar una vista previa local inmediata
+    const localPreview = URL.createObjectURL(file);
+    setImagenUrl(localPreview);
+
+    // Crear FormData para la subida
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al subir la imagen');
+      }
+
+      const data = await response.json();
+      // Actualizar URL con la ruta real de la imagen en el servidor
+      setImagenUrl(data.url);
+      // Liberar memoria de la vista previa local
+      URL.revokeObjectURL(localPreview);
+    } catch (error) {
+      console.error('Error al subir imagen destacada:', error);
+      // Eliminar la vista previa en caso de error
+      URL.revokeObjectURL(localPreview);
+      setImagenUrl('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -248,16 +288,60 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="imagenUrl" className="block text-sm font-medium text-[#2e3954] mb-1">
-            URL de la imagen destacada
+            Imagen destacada
           </label>
-          <input
-            type="text"
-            id="imagenUrl"
-            value={imagenUrl}
-            onChange={(e) => setImagenUrl(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-800 bg-white"
-            placeholder="URL de la imagen destacada (opcional)"
-          />
+          <div className="flex flex-col space-y-2">
+            {/* Campo para URL directa */}
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                id="imagenUrl"
+                value={imagenUrl}
+                onChange={(e) => setImagenUrl(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-800 bg-white"
+                placeholder="URL de la imagen destacada"
+              />
+              <label 
+                htmlFor="fileUpload" 
+                className="px-3 py-2 bg-[#2e3954] text-white rounded-lg cursor-pointer hover:bg-opacity-90 transition flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                </svg>
+                Subir
+              </label>
+              <input
+                type="file"
+                id="fileUpload"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </div>
+            
+            {/* Vista previa de la imagen */}
+            {imagenUrl && (
+              <div className="mt-2 relative">
+                <div className="relative h-48 bg-gray-100 rounded-lg overflow-hidden">
+                  <img 
+                    src={imagenUrl} 
+                    alt="Vista previa" 
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImagenUrl('')}
+                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    title="Eliminar imagen"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-end">
