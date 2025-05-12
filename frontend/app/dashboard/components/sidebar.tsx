@@ -206,7 +206,7 @@ const MiniCalendar = () => {
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -307,7 +307,13 @@ export default function Sidebar() {
       {/* Logo and collapse button */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-opacity-20 border-[#8dbba3] sticky top-0 bg-[#2e3954] z-10">
         {!collapsed && (
-          <span className="text-xl font-semibold text-white">PlataformaERP</span>
+          <Link href="/dashboard" className="group transition-all duration-300 ease-in-out">
+            <img 
+              src="/grupokossodo_blanco.png" 
+              alt="Grupo Kossodo" 
+              className="h-8 transform transition-transform duration-300 group-hover:scale-110"
+            />
+          </Link>
         )}
         <button 
           onClick={() => setCollapsed(!collapsed)}
