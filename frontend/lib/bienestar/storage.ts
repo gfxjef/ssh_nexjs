@@ -32,7 +32,7 @@ const initialPosts: Post[] = [
     vistas: 1240,
     estado: 'publicado',
     destacado: true,
-    imagenUrl: '/grupokossodo_logo.webp'
+    imagenUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop'
   },
   {
     id: 2,
@@ -46,7 +46,7 @@ const initialPosts: Post[] = [
     vistas: 985,
     estado: 'publicado',
     destacado: false,
-    imagenUrl: '/grupokossodo_blanco.png'
+    imagenUrl: 'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=800&auto=format&fit=crop'
   },
   {
     id: 3,
@@ -60,7 +60,7 @@ const initialPosts: Post[] = [
     vistas: 762,
     estado: 'borrador',
     destacado: false,
-    imagenUrl: ''
+    imagenUrl: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop'
   },
   {
     id: 4,
@@ -74,7 +74,7 @@ const initialPosts: Post[] = [
     vistas: 542,
     estado: 'publicado',
     destacado: false,
-    imagenUrl: ''
+    imagenUrl: 'https://images.unsplash.com/photo-1579126038374-6064e9370f0f?w=800&auto=format&fit=crop'
   },
   {
     id: 5,
@@ -88,7 +88,7 @@ const initialPosts: Post[] = [
     vistas: 1576,
     estado: 'borrador',
     destacado: true,
-    imagenUrl: ''
+    imagenUrl: 'https://images.unsplash.com/photo-1556075798-4825dfaaf498?w=800&auto=format&fit=crop'
   },
   {
     id: 6,
@@ -102,22 +102,30 @@ const initialPosts: Post[] = [
     vistas: 892,
     estado: 'archivado',
     destacado: false,
-    imagenUrl: ''
+    imagenUrl: 'https://images.unsplash.com/photo-1614741118887-7a4ee193a5fa?w=800&auto=format&fit=crop'
   }
 ];
 
 /**
  * Inicializa el almacenamiento local si no existe
  */
-export function initializeStorage(): void {
-  // Verifica si ya hay datos en localStorage para no sobrescribirlos
-  if (!localStorage.getItem(CATEGORIES_STORAGE_KEY)) {
+export function initializeStorage(forceReset = false): void {
+  // Si se fuerza el reset o no hay datos en localStorage, inicializar
+  if (forceReset || !localStorage.getItem(CATEGORIES_STORAGE_KEY)) {
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(initialCategories));
   }
   
-  if (!localStorage.getItem(POSTS_STORAGE_KEY)) {
+  if (forceReset || !localStorage.getItem(POSTS_STORAGE_KEY)) {
     localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(initialPosts));
   }
+}
+
+/**
+ * Limpia todos los datos almacenados
+ */
+export function clearStorage(): void {
+  localStorage.removeItem(POSTS_STORAGE_KEY);
+  localStorage.removeItem(CATEGORIES_STORAGE_KEY);
 }
 
 /**

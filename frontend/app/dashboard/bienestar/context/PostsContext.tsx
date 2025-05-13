@@ -18,7 +18,8 @@ import {
   getPostById as getPostByIdFromStorage,
   getCategoryById as getCategoryByIdFromStorage,
   changePostStatus as changePostStatusInStorage,
-  togglePostHighlight as togglePostHighlightInStorage
+  togglePostHighlight as togglePostHighlightInStorage,
+  clearStorage
 } from '../../../../lib/bienestar/storage';
 import { useNotifications } from './NotificationsContext';
 
@@ -48,8 +49,17 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
       try {
         setLoading(true);
         
-        // Inicializar almacenamiento la primera vez
-        initializeStorage();
+        // Verificar si ya hay datos en localStorage antes de inicializar
+        const existingPosts = localStorage.getItem('bienestar_posts');
+        const existingCategories = localStorage.getItem('bienestar_categories');
+        
+        if (!existingPosts || !existingCategories) {
+          // Solo inicializar si no hay datos
+          console.log("Inicializando datos de bienestar posts...");
+          initializeStorage(true);
+        } else {
+          console.log("Usando datos existentes de bienestar posts");
+        }
 
         // Cargar posts y categorías
         const loadedPosts = loadPosts();
