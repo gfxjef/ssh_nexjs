@@ -8,8 +8,6 @@ from datetime import datetime, timedelta
 from ..mysql_connection import MySQLConnection
 from ..config import get_jwt_secret
 
-db_conn = MySQLConnection()
-
 def hash_password(password):
     """
     Genera un hash seguro para la contraseña.
@@ -100,7 +98,8 @@ def login_usuario(usuario, password):
     WHERE (usuario = %s OR correo = %s)
     """
     
-    users = db_conn.execute_query(query, (usuario, usuario))
+    db_ops = MySQLConnection()
+    users = db_ops.execute_query(query, (usuario, usuario))
     
     if not users or len(users) == 0:
         print(f"No se encontró usuario con nombre/correo: {usuario}")
@@ -156,7 +155,8 @@ def obtener_usuario_por_id(usuario_id):
     WHERE id = %s
     """
     
-    users = db_conn.execute_query(query, (usuario_id,))
+    db_ops = MySQLConnection()
+    users = db_ops.execute_query(query, (usuario_id,))
     
     if not users or len(users) == 0:
         return None
@@ -179,7 +179,8 @@ def verificar_tabla_usuarios():
     AND table_name = 'usuarios'
     """
     
-    table_exists = db_conn.execute_query(check_table_query)
+    db_ops = MySQLConnection()
+    table_exists = db_ops.execute_query(check_table_query)
     
     if not table_exists or table_exists[0]['existe'] == 0:
         return {
@@ -196,7 +197,7 @@ def verificar_tabla_usuarios():
     ORDER BY ORDINAL_POSITION
     """
     
-    columns_data = db_conn.execute_query(columns_query)
+    columns_data = db_ops.execute_query(columns_query)
     
     # Convertir objetos que puedan ser bytes a str para la serialización JSON
     columns = []
@@ -213,7 +214,7 @@ def verificar_tabla_usuarios():
     
     # Contar registros
     count_query = "SELECT COUNT(*) as total FROM usuarios"
-    count_result = db_conn.execute_query(count_query)
+    count_result = db_ops.execute_query(count_query)
     total_users = count_result[0]['total'] if count_result else 0
     
     return {

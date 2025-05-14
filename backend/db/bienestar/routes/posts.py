@@ -14,9 +14,6 @@ from ..queries import (
 from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
 
-# Obtener una instancia del singleton de conexión
-db_conn = MySQLConnection()
-
 @bienestar_bp.route('/posts', methods=['GET'])
 def get_posts():
     print("DEBUG: Iniciando get_posts()") # Log
@@ -34,6 +31,7 @@ def get_posts():
     """
     try:
         status = request.args.get('status')
+        db_ops = MySQLConnection() # AÑADIDO
         category_id = request.args.get('category')
         search_term = request.args.get('search')
         destacados = request.args.get('destacados', '').lower() == 'true'
@@ -43,21 +41,21 @@ def get_posts():
         
         if destacados:
             print("DEBUG: get_posts() - Obteniendo posts destacados...") # Log
-            posts = db_conn.execute_query(GET_POSTS_HIGHLIGHTED)
+            posts = db_ops.execute_query(GET_POSTS_HIGHLIGHTED) # MODIFICADO
         elif search_term:
             print(f"DEBUG: get_posts() - Buscando posts con término: {search_term}...") # Log
             search_param = f'%{search_term}%'
-            posts = db_conn.execute_query(SEARCH_POSTS, (search_param, search_param, search_param))
+            posts = db_ops.execute_query(SEARCH_POSTS, (search_param, search_param, search_param)) # MODIFICADO
         elif status and status in [e.value for e in PostStatus]:
             print(f"DEBUG: get_posts() - Obteniendo posts por estado: {status}...") # Log
-            posts = db_conn.execute_query(GET_POSTS_BY_STATUS, (status,))
+            posts = db_ops.execute_query(GET_POSTS_BY_STATUS, (status,)) # MODIFICADO
         elif category_id and category_id.isdigit():
             print(f"DEBUG: get_posts() - Obteniendo posts por categoría ID: {category_id}...") # Log
-            posts = db_conn.execute_query(GET_POSTS_BY_CATEGORY, (int(category_id),))
+            posts = db_ops.execute_query(GET_POSTS_BY_CATEGORY, (int(category_id),)) # MODIFICADO
         else:
             print("DEBUG: get_posts() - Obteniendo todos los posts (GET_ALL_POSTS)...") # Log
             try:
-                posts = db_conn.execute_query(GET_ALL_POSTS)
+                posts = db_ops.execute_query(GET_ALL_POSTS) # MODIFICADO
             except Exception as query_exc:
                 query_error_details = traceback.format_exc()
                 print(f"ERROR CRÍTICO durante execute_query(GET_ALL_POSTS): {str(query_exc)}\n{query_error_details}")
@@ -115,9 +113,10 @@ def get_post(post_id):
     try:
         # Verificar si se debe incrementar vistas
         increment_views = request.args.get('increment_views', '').lower() == 'true'
+        db_ops = MySQLConnection() # AÑADIDO
         
         # Obtener post
-        post_data = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        post_data = db_ops.execute_query(GET_POST_BY_ID, (post_id,)) # MODIFICADO
         
         if not post_data:
             return jsonify({
@@ -127,7 +126,7 @@ def get_post(post_id):
         
         # Incrementar vistas si se ha solicitado y el post está publicado
         if increment_views and post_data[0]['estado'] == PostStatus.PUBLISHED.value:
-            db_conn.execute_query(INCREMENT_VIEWS, (post_id,), fetch=False)
+            db_ops.execute_query(INCREMENT_VIEWS, (post_id,), fetch=False) # MODIFICADO
             post_data[0]['vistas'] += 1
         
         return jsonify({
@@ -166,7 +165,7 @@ def create_post():
         
         # Verificar si la categoría existe
         categoria_id = data['categoriaId']
-        categoria = db_conn.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,))
+        categoria = db_ops.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,)) # MODIFICADO
         
         if not categoria:
             return jsonify({
@@ -175,7 +174,7 @@ def create_post():
             }), 400
         
         # Insertar post
-        insert_result = db_conn.execute_query(
+        insert_result = db_ops.execute_query(
             INSERT_POST,
             (
                 data['titulo'],
@@ -198,7 +197,7 @@ def create_post():
             }), 500
         
         # Obtener el ID del último insert
-        last_id_result = db_conn.execute_query("SELECT LAST_INSERT_ID() as id")
+        last_id_result = db_ops.execute_query("SELECT LAST_INSERT_ID() as id") # MODIFICADO
         
         # Imprimir debug info
         print(f"DEBUG - last_id_result: {last_id_result}")
@@ -226,7 +225,7 @@ def create_post():
             ORDER BY created_at DESC LIMIT 1
             """
             
-            alt_result = db_conn.execute_query(alt_query, (
+            alt_result = db_ops.execute_query(alt_query, (
                 data['titulo'],
                 data['extracto'],
                 data['autor']
@@ -239,7 +238,7 @@ def create_post():
                 print(f"DEBUG - ID alternativo encontrado: {last_id}")
         
         # Obtener el post recién creado
-        new_post = db_conn.execute_query(GET_POST_BY_ID, (last_id,))
+        new_post = db_ops.execute_query(GET_POST_BY_ID, (last_id,)) # MODIFICADO
         
         # Imprimir debug info
         print(f"DEBUG - new_post: {new_post}")
@@ -289,7 +288,8 @@ def update_post(post_id):
             }), 400
         
         # Verificar si existe el post
-        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        db_ops = MySQLConnection() # AÑADIDO
+        existing = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -302,7 +302,7 @@ def update_post(post_id):
         imagen_url = data.get('imagenUrl', existing[0]['imagen_url'])
         
         # Actualizar post
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             UPDATE_POST,
             (
                 data['titulo'],
@@ -325,7 +325,7 @@ def update_post(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -358,17 +358,18 @@ def change_post_status(post_id):
                 'error': 'Se requiere el campo status'
             }), 400
         
-        new_status = data['status']
+        nuevo_estado = data['status']
         
         # Validar el estado
-        if new_status not in [e.value for e in PostStatus]:
+        if nuevo_estado not in [e.value for e in PostStatus]:
             return jsonify({
                 'success': False,
                 'error': f'Estado no válido. Debe ser uno de: {", ".join([e.value for e in PostStatus])}'
             }), 400
         
         # Verificar si existe el post
-        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        db_ops = MySQLConnection() # AÑADIDO
+        existing = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -376,9 +377,9 @@ def change_post_status(post_id):
             }), 404
         
         # Actualizar estado
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             UPDATE_POST_STATUS,
-            (new_status, post_id),
+            (nuevo_estado, post_id),
             fetch=False
         )
         
@@ -389,7 +390,7 @@ def change_post_status(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -417,7 +418,8 @@ def toggle_post_highlight(post_id):
         data = request.json
         
         # Verificar si existe el post
-        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        db_ops = MySQLConnection() # AÑADIDO
+        existing = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -432,7 +434,7 @@ def toggle_post_highlight(post_id):
             new_highlight = bool(data['destacado'])
         
         # Actualizar destacado
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             UPDATE_POST_HIGHLIGHT,
             (new_highlight, post_id),
             fetch=False
@@ -445,7 +447,7 @@ def toggle_post_highlight(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -471,7 +473,8 @@ def delete_post(post_id):
     """
     try:
         # Verificar si existe el post
-        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
+        db_ops = MySQLConnection() # AÑADIDO
+        existing = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -479,7 +482,7 @@ def delete_post(post_id):
             }), 404
         
         # Eliminar post
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             DELETE_POST,
             (post_id,),
             fetch=False

@@ -30,7 +30,7 @@ CORS(
 from db.config import get_jwt_secret
 
 # Crear instancia de conexión a BD
-db_conn = MySQLConnection()
+# db_conn = MySQLConnection() # ELIMINADO
 
 # Registrar el blueprint de bienestar con el prefijo correcto
 app.register_blueprint(bienestar_bp, url_prefix='/api/bienestar')
@@ -55,7 +55,8 @@ def login():
     if usuario == 'admin':
         # Consultar la contraseña almacenada
         query = "SELECT pass FROM usuarios WHERE usuario = %s"
-        result = db_conn.execute_query(query, (usuario,))
+        db_ops = MySQLConnection() # AÑADIDO
+        result = db_ops.execute_query(query, (usuario,)) # MODIFICADO
         if result and len(result) > 0:
             stored_pass = result[0]['pass']
             print(f"Contraseña almacenada para admin: {stored_pass}")
@@ -125,7 +126,8 @@ def list_usuarios():
     LIMIT 10
     """
     
-    usuarios = db_conn.execute_query(query)
+    db_ops = MySQLConnection() # AÑADIDO
+    usuarios = db_ops.execute_query(query) # MODIFICADO
     
     if not usuarios:
         return jsonify({'message': 'No se encontraron usuarios'}), 404

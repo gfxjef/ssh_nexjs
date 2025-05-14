@@ -10,32 +10,70 @@ import { Post } from '../../../../../lib/bienestar/types';
 export default function PostDetail() {
   const params = useParams();
   const router = useRouter();
-  const postId = Number(params.id);
   
-  const { getPostById, getCategoryById, loading } = usePosts();
+  // Estado para postId, inicializado como null o un número
+  const [postId, setPostId] = useState<number | null>(null);
+  
+  const { getPostById, getCategoryById, loading: contextLoading } = usePosts();
   // Inicializamos el estado con tipo Post | undefined
   const [post, setPost] = useState<Post | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   
   // Obtenemos el post usando useEffect para evitar la actualización durante el renderizado
   useEffect(() => {
+    // Primero, procesamos params.id
+    if (params && typeof params.id === 'string') {
+      const numericId = Number(params.id);
+      if (!isNaN(numericId) && numericId > 0) {
+        setPostId(numericId);
+      } else {
+        console.error("ID de post no válido:", params.id);
+        setIsLoadingPage(false); 
+        setPost(undefined); 
+        return;
+      }
+    } else if (params) { 
+        console.error("params.id no es una cadena o no existe:", params);
+        setIsLoadingPage(false);
+        setPost(undefined);
+        return;
+    }
+    // Si params es null, esperamos a que se popule, no hacemos nada aquí
+  }, [params, router]);
+
+  useEffect(() => {
     const fetchPost = () => {
-      if (postId) {
+      if (postId && postId > 0) {
+        console.log(`PostDetail: Intentando obtener post con ID: ${postId}`);
         const postData = getPostById(postId);
         setPost(postData);
-        setIsLoading(false);
       }
+      // Marcamos la carga de la página como completada solo después de intentar obtener el post
+      setIsLoadingPage(false); 
     };
     
-    fetchPost();
-  }, [postId, getPostById]);
+    // Solo intentar cargar el post si el contexto NO está cargando y ya hemos procesado params
+    if (!contextLoading && params) {
+        fetchPost();
+    } else if (params) {
+        // Si el contexto está cargando pero ya tenemos params, aún consideramos que la página está cargando
+        setIsLoadingPage(true);
+    }
+  }, [postId, getPostById, contextLoading, params]);
   
   // Si no se encontró el post, redirigir a la lista de posts
   useEffect(() => {
-    if (!isLoading && !loading && !post) {
+    // Redirigir solo si:
+    // 1. Los parámetros de la URL (params) han sido procesados.
+    // 2. La carga específica de esta página (isLoadingPage) ha terminado.
+    // 3. El contexto de posts (contextLoading) ha terminado de cargar.
+    // 4. El post sigue sin encontrarse (post es undefined).
+    // 5. Se intentó establecer un postId (postId no es null).
+    if (params && !isLoadingPage && !contextLoading && !post && postId !== null) { 
+      console.log(`PostDetail: Post ID ${postId} no encontrado o inválido tras carga de contexto, redirigiendo...`);
       router.push('/dashboard/bienestar/posts');
     }
-  }, [post, loading, isLoading, router]);
+  }, [post, contextLoading, isLoadingPage, router, postId, params]);
   
   // Formatear fecha
   const formatearFecha = (fechaString: string) => {
@@ -49,8 +87,8 @@ export default function PostDetail() {
     });
   };
   
-  // Si está cargando o no se encuentra el post
-  if (loading || isLoading || !post) {
+  // Si está cargando el contexto o la página, o no se encuentra el post
+  if (contextLoading || isLoadingPage || !post) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954]"></div>

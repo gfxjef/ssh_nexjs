@@ -11,9 +11,6 @@ from ..queries import (
 from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
 
-# Obtener una instancia del singleton de conexión
-db_conn = MySQLConnection()
-
 @bienestar_bp.route('/categories', methods=['GET'])
 def get_categories():
     print("DEBUG: Iniciando get_categories()") # Log
@@ -25,8 +22,9 @@ def get_categories():
     """
     try:
         print("DEBUG: get_categories() - Obteniendo todas las categorías (GET_ALL_CATEGORIES)...") # Log
+        db_ops = MySQLConnection()
         try:
-            categories = db_conn.execute_query(GET_ALL_CATEGORIES)
+            categories = db_ops.execute_query(GET_ALL_CATEGORIES)
         except Exception as query_exc:
             query_error_details = traceback.format_exc()
             print(f"ERROR CRÍTICO durante execute_query(GET_ALL_CATEGORIES): {str(query_exc)}\n{query_error_details}")
@@ -79,7 +77,8 @@ def get_category(category_id):
         json: Categoría encontrada o error
     """
     try:
-        category = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        db_ops = MySQLConnection()
+        category = db_ops.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         
         if not category:
             return jsonify({
@@ -119,7 +118,8 @@ def create_category():
             }), 400
         
         # Verificar si ya existe una categoría con el mismo nombre
-        existing = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        db_ops = MySQLConnection()
+        existing = db_ops.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         if existing:
             return jsonify({
                 'success': False,
@@ -127,7 +127,7 @@ def create_category():
             }), 400
         
         # Insertar categoría
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             INSERT_CATEGORY, 
             (data['nombre'], data.get('color', '#2e3954')),
             fetch=False
@@ -140,7 +140,7 @@ def create_category():
             }), 500
         
         # Obtener la categoría recién creada
-        new_category = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        new_category = db_ops.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         
         return jsonify({
             'success': True,
@@ -179,7 +179,8 @@ def update_category_route(category_id): # Renombrado para evitar conflicto
             }), 400
         
         # Verificar si existe la categoría
-        existing = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        db_ops = MySQLConnection()
+        existing = db_ops.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -187,7 +188,7 @@ def update_category_route(category_id): # Renombrado para evitar conflicto
             }), 404
         
         # Verificar si ya existe otra categoría con el mismo nombre
-        name_check = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        name_check = db_ops.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         if name_check and name_check[0]['id'] != category_id:
             return jsonify({
                 'success': False,
@@ -195,7 +196,7 @@ def update_category_route(category_id): # Renombrado para evitar conflicto
             }), 400
         
         # Actualizar categoría
-        result = db_conn.execute_query(
+        result = db_ops.execute_query(
             UPDATE_CATEGORY,
             (data['nombre'], data.get('color', '#2e3954'), category_id),
             fetch=False
@@ -208,7 +209,7 @@ def update_category_route(category_id): # Renombrado para evitar conflicto
             }), 500
         
         # Obtener la categoría actualizada
-        updated_category = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        updated_category = db_ops.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         
         return jsonify({
             'success': True,
@@ -237,7 +238,8 @@ def delete_category_route(category_id): # Renombrado
     """
     try:
         # Verificar si existe la categoría
-        existing = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        db_ops = MySQLConnection()
+        existing = db_ops.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -248,7 +250,7 @@ def delete_category_route(category_id): # Renombrado
         # Este bloque debería implementarse para evitar borrar categorías en uso
         
         # Eliminar categoría
-        result = db_conn.execute_query(DELETE_CATEGORY, (category_id,), fetch=False)
+        result = db_ops.execute_query(DELETE_CATEGORY, (category_id,), fetch=False)
         
         if not result or 'affected_rows' not in result or result['affected_rows'] == 0:
             return jsonify({
