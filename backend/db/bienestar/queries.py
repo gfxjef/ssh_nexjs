@@ -129,4 +129,34 @@ UPDATE posts_bienestar SET
 WHERE id = %s
 """
 
-DELETE_POST = "DELETE FROM posts_bienestar WHERE id = %s" 
+DELETE_POST = "DELETE FROM posts_bienestar WHERE id = %s"
+
+# Consultas para Postulaciones
+CREATE_POSTULACIONES_TABLE = """
+CREATE TABLE IF NOT EXISTS postulaciones_bienestar (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  post_id INT NOT NULL,
+  usuario_id INT NOT NULL,
+  fecha_postulacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts_bienestar(id) ON DELETE CASCADE,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE 
+);
+"""
+
+INSERT_POSTULACION = """
+INSERT INTO postulaciones_bienestar (post_id, usuario_id) 
+VALUES (%s, %s)
+"""
+
+CHECK_EXISTING_POSTULACION = """
+SELECT id FROM postulaciones_bienestar 
+WHERE post_id = %s AND usuario_id = %s
+"""
+
+GET_POSTULANTES_BY_POST_ID = """
+SELECT u.id as usuario_id, u.nombre, u.correo, p.fecha_postulacion
+FROM postulaciones_bienestar p
+JOIN usuarios u ON p.usuario_id = u.id
+WHERE p.post_id = %s
+ORDER BY p.fecha_postulacion DESC
+""" 

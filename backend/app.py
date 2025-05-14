@@ -8,7 +8,7 @@ import db.login
 from db.mysql_connection import MySQLConnection
 
 # Importar el blueprint de bienestar
-from db.bienestar import bienestar_bp
+from db.bienestar import bienestar_bp, init_bienestar_db
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -34,6 +34,12 @@ from db.config import get_jwt_secret
 
 # Registrar el blueprint de bienestar con el prefijo correcto
 app.register_blueprint(bienestar_bp, url_prefix='/api/bienestar')
+
+# Inicializar la base de datos del módulo de bienestar
+with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la aplicación
+    print("APP: Llamando a init_bienestar_db()")
+    init_bienestar_db()
+    print("APP: init_bienestar_db() finalizado.")
 
 # Authentication routes
 @app.route('/api/auth/login', methods=['POST'])

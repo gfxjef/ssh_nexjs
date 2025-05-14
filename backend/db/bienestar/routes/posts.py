@@ -9,10 +9,13 @@ from ..queries import (
     GET_ALL_POSTS, GET_POSTS_BY_STATUS, GET_POSTS_BY_CATEGORY,
     GET_POSTS_HIGHLIGHTED, GET_POST_BY_ID, SEARCH_POSTS,
     INSERT_POST, UPDATE_POST, UPDATE_POST_STATUS, UPDATE_POST_HIGHLIGHT,
-    INCREMENT_VIEWS, DELETE_POST
+    INCREMENT_VIEWS, DELETE_POST, CHECK_EXISTING_POSTULACION, INSERT_POSTULACION,
+    GET_POSTULANTES_BY_POST_ID
 )
 from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
+# Importar funciones de login para verificación de token y obtención de datos de usuario
+from ...login import verificar_token, obtener_usuario_por_id # Asumiendo que están en el __init__ de login
 
 @bienestar_bp.route('/posts', methods=['GET'])
 def get_posts():
@@ -147,123 +150,147 @@ def create_post():
         json: Post creado o error
     """
     try:
-        data = request.json
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No se proporcionaron datos'}), 400
+
+        # Extraer datos del post
+        titulo = data.get('titulo')
+        contenido = data.get('contenido')
+        # Asegúrate de que categoria_id se maneje como entero
+        categoria_id_str = data.get('categoria_id')
+        imagen_url = data.get('imagen_url')
+        usuario_id = data.get('usuario_id') # Asumiendo que el ID del usuario se envía o se obtiene del token
         
-        # Validar datos
-        is_valid, error_msg = validate_post(data)
-        if not is_valid:
-            return jsonify({
-                'success': False,
-                'error': error_msg
-            }), 400
-        
-        # Preparar los datos para inserción
-        estado = data.get('estado', PostStatus.DRAFT.value)
-        destacado = data.get('destacado', False)
-        fecha = data.get('fecha', datetime.now().isoformat())
-        imagen_url = data.get('imagenUrl', '')
-        
-        # Verificar si la categoría existe
-        categoria_id = data['categoriaId']
-        categoria = db_ops.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,)) # MODIFICADO
-        
-        if not categoria:
-            return jsonify({
-                'success': False,
-                'error': f'La categoría con ID {categoria_id} no existe'
-            }), 400
-        
-        # Insertar post
-        insert_result = db_ops.execute_query(
-            INSERT_POST,
-            (
-                data['titulo'],
-                data['extracto'],
-                data['contenido'],
-                data['autor'],
-                fecha,
-                estado,
-                destacado,
-                categoria_id,
-                imagen_url
-            ),
-            fetch=False
-        )
-        
-        if not insert_result or 'affected_rows' not in insert_result or insert_result['affected_rows'] == 0:
-            return jsonify({
-                'success': False,
-                'error': 'No se pudo crear el post'
-            }), 500
-        
-        # Obtener el ID del último insert
-        last_id_result = db_ops.execute_query("SELECT LAST_INSERT_ID() as id") # MODIFICADO
-        
-        # Imprimir debug info
-        print(f"DEBUG - last_id_result: {last_id_result}")
-        
-        if not last_id_result or len(last_id_result) == 0:
-            return jsonify({
-                'success': False,
-                'error': 'No se pudo obtener el ID del post creado'
-            }), 500
+        if not all([titulo, contenido, categoria_id_str]):
+            return jsonify({'success': False, 'error': 'Título, contenido y ID de categoría son requeridos'}), 400
+
+        try:
+            categoria_id = int(categoria_id_str)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'El ID de categoría debe ser un número entero'}), 400
+
+        try:
+            mysql_conn = MySQLConnection() # Crear instancia
             
-        last_id = last_id_result[0]['id']
-        
-        # Imprimir debug info
-        print(f"DEBUG - last_id: {last_id}")
-        
-        # Si el ID es 0 o nulo, es un error
-        if last_id == 0 or last_id is None:
-            # Intentar obtener el ID mediante otra consulta
-            print("DEBUG - Intentando obtener el ID mediante consulta alternativa")
+            # Verificar si la categoría existe
+            categoria = mysql_conn.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,)) # CORREGIDO
             
-            # Tratar de encontrar el post recién creado por su título y contenido
-            alt_query = """
-            SELECT id FROM posts_bienestar 
-            WHERE titulo = %s AND extracto = %s AND autor = %s
-            ORDER BY created_at DESC LIMIT 1
-            """
+            if not categoria:
+                return jsonify({'success': False, 'error': f'La categoría con ID {categoria_id} no existe'}), 400
+
+            # Obtener el extracto del payload
+            extracto = data.get('extracto') # Asegurarse de que el frontend envía esto
+            if not extracto:
+                # Considerar si el extracto es obligatorio
+                # Por ahora, si no viene, se podría poner un placeholder o fallar si es mandatorio
+                # Para la query INSERT_POST es obligatorio
+                return jsonify({'success': False, 'error': 'El campo extracto es requerido'}), 400
+
+            # Usar el campo 'autor' que viene del frontend para la query, que espera un string para el campo 'autor'
+            autor_nombre = data.get('autor', 'Autor Desconocido') # Tomar 'autor' del payload, o un default
             
-            alt_result = db_ops.execute_query(alt_query, (
-                data['titulo'],
-                data['extracto'],
-                data['autor']
-            ))
+            # La query INSERT_POST espera 9 parámetros:
+            # titulo, extracto, contenido, autor, fecha, estado, destacado, categoria_id, imagen_url
+            insert_result = mysql_conn.execute_query(
+                INSERT_POST,
+                (
+                    titulo,                   # 1. titulo
+                    extracto,                 # 2. extracto
+                    contenido,                # 3. contenido
+                    autor_nombre,             # 4. autor (el nombre del autor, string)
+                    datetime.now().isoformat(), # 5. fecha
+                    PostStatus.DRAFT.value,   # 6. estado
+                    False,                    # 7. destacado (por defecto al crear)
+                    categoria_id,             # 8. categoria_id
+                    imagen_url                # 9. imagen_url
+                ),
+                fetch=False
+            )
             
-            print(f"DEBUG - alt_result: {alt_result}")
+            if not insert_result or 'affected_rows' not in insert_result or insert_result['affected_rows'] == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'No se pudo crear el post'
+                }), 500
             
-            if alt_result and len(alt_result) > 0:
-                last_id = alt_result[0]['id']
-                print(f"DEBUG - ID alternativo encontrado: {last_id}")
-        
-        # Obtener el post recién creado
-        new_post = db_ops.execute_query(GET_POST_BY_ID, (last_id,)) # MODIFICADO
-        
-        # Imprimir debug info
-        print(f"DEBUG - new_post: {new_post}")
-        
-        if not new_post or len(new_post) == 0:
-            # Si no podemos obtener el post, al menos devolvemos éxito pero con datos mínimos
+            # Obtener el ID del último insert
+            last_id_result = mysql_conn.execute_query("SELECT LAST_INSERT_ID() as id") # MODIFICADO
+            
+            # Imprimir debug info
+            print(f"DEBUG - last_id_result: {last_id_result}")
+            
+            if not last_id_result or len(last_id_result) == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'No se pudo obtener el ID del post creado'
+                }), 500
+            
+            last_id = last_id_result[0]['id']
+            
+            # Imprimir debug info
+            print(f"DEBUG - last_id: {last_id}")
+            
+            # Si el ID es 0 o nulo, es un error
+            if last_id == 0 or last_id is None:
+                # Intentar obtener el ID mediante otra consulta
+                print("DEBUG - Intentando obtener el ID mediante consulta alternativa")
+                
+                # Tratar de encontrar el post recién creado por su título y contenido
+                alt_query = """
+                SELECT id FROM posts_bienestar 
+                WHERE titulo = %s AND extracto = %s AND autor = %s
+                ORDER BY created_at DESC LIMIT 1
+                """
+                
+                alt_result = mysql_conn.execute_query(alt_query, (
+                    titulo,
+                    extracto,
+                    autor_nombre
+                ))
+                
+                print(f"DEBUG - alt_result: {alt_result}")
+                
+                if alt_result and len(alt_result) > 0:
+                    last_id = alt_result[0]['id']
+                    print(f"DEBUG - ID alternativo encontrado: {last_id}")
+            
+            # Obtener el post recién creado
+            new_post = mysql_conn.execute_query(GET_POST_BY_ID, (last_id,)) # MODIFICADO
+            
+            # Imprimir debug info
+            print(f"DEBUG - new_post: {new_post}")
+            
+            if not new_post or len(new_post) == 0:
+                # Si no podemos obtener el post, al menos devolvemos éxito pero con datos mínimos
+                return jsonify({
+                    'success': True,
+                    'message': 'Post creado correctamente pero no se pudo recuperar la información completa',
+                    'data': {
+                        'id': last_id,
+                        'titulo': titulo
+                    }
+                }), 201
+            
             return jsonify({
                 'success': True,
-                'message': 'Post creado correctamente pero no se pudo recuperar la información completa',
-                'data': {
-                    'id': last_id,
-                    'titulo': data['titulo']
-                }
+                'message': 'Post creado correctamente',
+                'data': post_schema(new_post[0])
             }), 201
-        
-        return jsonify({
-            'success': True,
-            'message': 'Post creado correctamente',
-            'data': post_schema(new_post[0])
-        }), 201
-        
+            
+        except Exception as e:
+            error_details = traceback.format_exc()
+            print(f"ERROR CRÍTICO en create_post: {str(e)}\n{error_details}")
+            return jsonify({'success': False, 'error': f'Error al crear post: {str(e)}'}), 500
+
     except Exception as e:
         error_details = traceback.format_exc()
-        print(f"ERROR CRÍTICO en create_post: {str(e)}\n{error_details}")
-        return jsonify({'success': False, 'error': f'Error al crear post: {str(e)}'}), 500
+        print(f"ERROR CRÍTICO en create_post(): {str(e)}\n{error_details}")
+        return jsonify({
+            'success': False,
+            'error': f'Error interno del servidor al crear post: {str(e)}',
+            'details': error_details
+        }), 500
 
 @bienestar_bp.route('/posts/<int:post_id>', methods=['PUT'])
 def update_post(post_id):
@@ -502,4 +529,159 @@ def delete_post(post_id):
     except Exception as e:
         error_details = traceback.format_exc()
         print(f"ERROR CRÍTICO en delete_post(id={post_id}): {str(e)}\n{error_details}")
-        return jsonify({'success': False, 'error': f'Error al eliminar post {post_id}: {str(e)}'}), 500 
+        return jsonify({'success': False, 'error': f'Error al eliminar post {post_id}: {str(e)}'}), 500
+
+@bienestar_bp.route('/posts/<int:post_id>/postular', methods=['POST'])
+def postular_al_post(post_id):
+    """
+    Permite a un usuario autenticado postularse a un post específico.
+    """
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'success': False, 'error': 'Token no proporcionado'}), 401
+
+    token = None
+    try:
+        # Espera un token "Bearer <token>"
+        token = auth_header.split(' ')[1]
+    except IndexError:
+        return jsonify({'success': False, 'error': 'Token malformado. Debe ser "Bearer <token>"'}), 401
+
+    payload = verificar_token(token)
+    if not payload:
+        return jsonify({'success': False, 'error': 'Token inválido o expirado'}), 401
+
+    usuario_id_autenticado = payload.get('sub')
+    if not usuario_id_autenticado:
+         return jsonify({'success': False, 'error': 'ID de usuario no encontrado en el token'}), 401
+
+    db_ops = MySQLConnection()
+
+    # 1. Verificar que el post exista
+    post_existente = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
+    if not post_existente:
+        return jsonify({'success': False, 'error': 'Post no encontrado'}), 404
+
+    # 2. (Opcional pero recomendado) Verificar si el post es de la categoría "Postulaciones"
+    # Asumimos que post_schema y las queries devuelven 'categoria_nombre' o similar
+    # Esta parte es conceptual, la implementación exacta de post_schema puede variar.
+    # Para simplificar, la omitimos por ahora, pero es una buena validación.
+    # post_data_raw = post_existente[0]
+    # if post_data_raw.get('categoria_nombre', '').lower() != 'postulaciones':
+    #    return jsonify({'success': False, 'error': 'Este post no admite postulaciones directas por esta vía.'}), 400
+
+
+    # 3. Verificar si el usuario ya se postuló a este post
+    ya_postulado = db_ops.execute_query(CHECK_EXISTING_POSTULACION, (post_id, usuario_id_autenticado))
+    if ya_postulado: # si la consulta devuelve alguna fila, significa que ya existe
+        return jsonify({'success': False, 'error': 'Ya te has postulado a esta oferta'}), 409 # 409 Conflict
+
+    # 4. Registrar la postulación
+    result = db_ops.execute_query(
+        INSERT_POSTULACION,
+        (post_id, usuario_id_autenticado),
+        fetch=False  # Es una inserción, no esperamos un fetch de datos
+    )
+
+    if not result or result.get('affected_rows', 0) == 0:
+        # Este error podría ocurrir si hay un problema con la BD o la query
+        print(f"Error al insertar postulación: post_id={post_id}, usuario_id={usuario_id_autenticado}, result={result}")
+        return jsonify({'success': False, 'error': 'No se pudo registrar la postulación debido a un error interno'}), 500
+
+    # (Opcional) Podrías querer devolver información del usuario que se postuló, o el ID de la postulación
+    # usuario_info = obtener_usuario_por_id(usuario_id_autenticado) # Si quieres devolver datos del usuario
+
+    return jsonify({
+        'success': True,
+        'message': 'Postulación registrada correctamente'
+        # 'postulante_id': usuario_id_autenticado, # Opcional
+        # 'postulante_nombre': usuario_info.get('nombre') if usuario_info else None # Opcional
+    }), 201 
+
+@bienestar_bp.route('/posts/<int:post_id>/postulacion/status', methods=['GET'])
+def get_estado_postulacion(post_id):
+    """
+    Verifica si el usuario autenticado actual ya se ha postulado a un post específico.
+    """
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({'success': False, 'error': 'Token no proporcionado'}), 401
+
+    token = None
+    try:
+        token = auth_header.split(' ')[1]
+    except IndexError:
+        return jsonify({'success': False, 'error': 'Token malformado'}), 401
+
+    payload = verificar_token(token)
+    if not payload:
+        return jsonify({'success': False, 'error': 'Token inválido o expirado'}), 401
+
+    usuario_id_autenticado = payload.get('sub')
+    if not usuario_id_autenticado:
+         return jsonify({'success': False, 'error': 'ID de usuario no encontrado en el token'}), 401
+
+    db_ops = MySQLConnection()
+
+    # Verificar que el post exista (opcional, pero buena práctica)
+    post_existente = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
+    if not post_existente:
+        return jsonify({'success': False, 'error': 'Post no encontrado'}), 404
+
+    # Verificar si el usuario ya se postuló
+    postulacion_existente = db_ops.execute_query(CHECK_EXISTING_POSTULACION, (post_id, usuario_id_autenticado))
+    
+    if postulacion_existente: # Si la consulta devuelve alguna fila
+        return jsonify({'success': True, 'data': {'postulado': True}})
+    else:
+        # Podría ser que la query devuelva None si hay un error, o una lista vacía si no hay match
+        if postulacion_existente is None:
+            # Esto indicaría un error en la consulta, no que no esté postulado
+            return jsonify({'success': False, 'error': 'Error al verificar el estado de la postulación'}), 500
+        return jsonify({'success': True, 'data': {'postulado': False}})
+
+@bienestar_bp.route('/posts/<int:post_id>/postulantes', methods=['GET'])
+def get_postulantes_del_post(post_id):
+    """
+    Obtiene la lista de usuarios que se han postulado a un post específico.
+    Requiere autenticación (aunque la protección específica del endpoint no está implementada aquí).
+    """
+    # Se podría añadir verificación de token aquí si se requiere que solo ciertos usuarios vean esto.
+    # Por ahora, asumimos que el acceso está gestionado a nivel de frontend o configuración de red.
+
+    db_ops = MySQLConnection()
+
+    # 1. Verificar que el post exista y sea de la categoría correcta (opcional pero recomendado)
+    post_existente = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
+    if not post_existente:
+        return jsonify({'success': False, 'error': 'Post no encontrado'}), 404
+    
+    # Podríamos verificar si post_existente[0]['categoria_nombre'] == 'Postulaciones'
+    # Pero la query GET_POSTULANTES_BY_POST_ID ya filtra por post_id, así que es implícito.
+
+    # 2. Obtener los postulantes
+    try:
+        postulantes_data = db_ops.execute_query(GET_POSTULANTES_BY_POST_ID, (post_id,))
+        
+        if postulantes_data is None:
+            # Esto indicaría un error en la consulta SQL en sí misma.
+            print(f"Error crítico al ejecutar GET_POSTULANTES_BY_POST_ID para post_id={post_id}")
+            return jsonify({'success': False, 'error': 'Error interno al obtener postulantes'}), 500
+
+        # Importar el schema aquí para evitar importación circular si estuviera en models.py y models importara de routes
+        from ..models import postulante_schema 
+        serialized_postulantes = [postulante_schema(p) for p in postulantes_data]
+        
+        return jsonify({
+            'success': True,
+            'data': serialized_postulantes
+        })
+
+    except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en get_postulantes_del_post(post_id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({
+            'success': False, 
+            'error': f'Error interno del servidor: {str(e)}',
+            'details': error_details
+        }), 500 

@@ -124,4 +124,24 @@ def validate_category(category_data):
     if errors:
         return (False, ", ".join(errors))
     
-    return (True, "") 
+    return (True, "")
+
+def postulante_schema(postulante_data):
+    """
+    Convierte un registro de la base de datos de un postulante a un diccionario formateado.
+    
+    Args:
+        postulante_data (dict): Registro de base de datos del postulante
+        
+    Returns:
+        dict: Postulante formateado para API
+    """
+    if not postulante_data:
+        return None
+    
+    return {
+        'usuarioId': postulante_data.get('usuario_id'),
+        'nombre': postulante_data.get('nombre', 'No disponible'),
+        'correo': postulante_data.get('correo', 'No disponible'),
+        'fechaPostulacion': postulante_data['fecha_postulacion'].isoformat() if isinstance(postulante_data.get('fecha_postulacion'), datetime) else postulante_data.get('fecha_postulacion')
+    } 
