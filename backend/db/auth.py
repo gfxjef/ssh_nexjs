@@ -5,8 +5,11 @@ Proporciona funciones para login, registro y validación de tokens.
 import jwt
 import hashlib
 from datetime import datetime, timedelta
-from .mysql_connection import execute_query
+from .mysql_connection import MySQLConnection
 from .config import get_jwt_secret
+
+# Obtener una instancia del singleton de conexión
+db_conn = MySQLConnection()
 
 def hash_password(password):
     """
@@ -86,7 +89,7 @@ def login_user(username, password):
     WHERE username = %s AND password = %s
     """
     
-    users = execute_query(query, (username, hashed_password))
+    users = db_conn.execute_query(query, (username, hashed_password))
     
     if not users or len(users) == 0:
         return None
@@ -117,7 +120,7 @@ def register_user(username, password):
     
     # Verificar si el usuario ya existe
     check_query = "SELECT id FROM users WHERE username = %s"
-    existing_users = execute_query(check_query, (username,))
+    existing_users = db_conn.execute_query(check_query, (username,))
     
     if existing_users and len(existing_users) > 0:
         return None
@@ -128,14 +131,14 @@ def register_user(username, password):
     VALUES (%s, %s, NOW())
     """
     
-    result = execute_query(insert_query, (username, hashed_password), fetch=False)
+    result = db_conn.execute_query(insert_query, (username, hashed_password), fetch=False)
     
     if not result or result.get('affected_rows', 0) == 0:
         return None
     
     # Obtener el ID del usuario recién insertado
     get_id_query = "SELECT LAST_INSERT_ID() as id"
-    id_result = execute_query(get_id_query)
+    id_result = db_conn.execute_query(get_id_query)
     
     if not id_result or len(id_result) == 0:
         return None
@@ -168,5 +171,5 @@ def init_auth_tables():
     )
     """
     
-    result = execute_query(create_table_query, fetch=False)
+    result = db_conn.execute_query(create_table_query, fetch=False)
     return result is not None 

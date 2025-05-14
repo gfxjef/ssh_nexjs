@@ -40,4 +40,7 @@ __pycache__/
 
 # Task files
 tasks.json
-tasks/ 
+tasks/
+
+# Frontend uploads
+frontend/public/uploads/posts/ 

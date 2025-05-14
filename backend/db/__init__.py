@@ -2,7 +2,7 @@
 Paquete para gestionar conexiones y operaciones de base de datos.
 """
 from .config import get_db_config, get_jwt_secret
-from .mysql_connection import get_connection, execute_query, execute_many
+# from .mysql_connection import get_connection, execute_query, execute_many # ELIMINADA
 from .auth import (
     login_user, 
     register_user, 

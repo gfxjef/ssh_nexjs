@@ -5,7 +5,7 @@ import FeaturedPostsSlider from './FeaturedPostsSlider';
 import RecentPostsGrid from './RecentPostsGrid';
 import { PostsProvider } from '../../app/dashboard/bienestar/context/PostsContext';
 import { NotificationsProvider } from '../../app/dashboard/bienestar/context/NotificationsContext';
-import { clearStorage, initializeStorage } from '../../lib/bienestar/storage';
+// import { clearStorage, initializeStorage } from '../../lib/bienestar/storage'; // Comentado: Ya no se usa directamente aquí
 
 interface BienestarPostsProps {
   title?: string;
@@ -25,14 +25,15 @@ export default function BienestarPosts({
   maxFeatured = 5,
   maxRecent = 6
 }: BienestarPostsProps) {
-  // Función para reiniciar los datos
-  const handleResetData = () => {
-    if (confirm('¿Estás seguro que deseas reiniciar los datos? Esta acción no se puede deshacer.')) {
-      clearStorage();
-      initializeStorage(true);
-      window.location.reload();
-    }
-  };
+  // Función para reiniciar los datos (COMENTADA)
+  // const handleResetData = () => {
+  //   if (confirm('¿Estás seguro que deseas reiniciar los datos? Esta acción no se puede deshacer.')) {
+  //     // clearStorage(); // No llamar a funciones neutralizadas
+  //     // initializeStorage(true); // No llamar a funciones neutralizadas
+  //     console.log("Simulación: Datos reiniciados (funcionalidad eliminada)");
+  //     window.location.reload();
+  //   }
+  // };
 
   return (
     <NotificationsProvider>
@@ -43,6 +44,8 @@ export default function BienestarPosts({
               <h1 className="text-3xl font-bold text-[#2e3954]">{title}</h1>
               <div className="w-20 h-1 bg-[#8dbba3] mt-2"></div>
             </div>
+            {/* Botón de reiniciar datos (COMENTADO) */}
+            {/* 
             <button 
               onClick={handleResetData}
               className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
@@ -50,6 +53,7 @@ export default function BienestarPosts({
             >
               Reiniciar datos
             </button>
+            */}
           </div>
           
           {/* Sección de posts destacados */}

@@ -148,26 +148,34 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
 
     try {
       setLoading(true);
-      const response = await fetch('/api/images/upload', {
+      const response = await fetch('/api/images/upload', { // Asume que este endpoint existe y funciona
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        let error;
+        try {
+            error = await response.json();
+        } catch (e) {
+            error = { error: response.statusText || 'Error desconocido al subir imagen' };
+        }
         throw new Error(error.error || 'Error al subir la imagen');
       }
 
       const data = await response.json();
       // Actualizar URL con la ruta real de la imagen en el servidor
       setImagenUrl(data.url);
-      // Liberar memoria de la vista previa local
+      // Liberar memoria de la vista previa local si la subida fue exitosa
       URL.revokeObjectURL(localPreview);
     } catch (error) {
       console.error('Error al subir imagen destacada:', error);
-      // Eliminar la vista previa en caso de error
-      URL.revokeObjectURL(localPreview);
-      setImagenUrl('');
+      // Eliminar la vista previa en caso de error si no se ha establecido una imagenUrl del servidor
+      if (imagenUrl === localPreview) {
+        setImagenUrl('');
+      }
+      URL.revokeObjectURL(localPreview); // Siempre liberar la URL del objeto local
+      // Considera mostrar una notificación al usuario aquí
     } finally {
       setLoading(false);
     }
@@ -301,6 +309,7 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-800 bg-white"
                 placeholder="URL de la imagen destacada"
               />
+              {/* Botón de subir imagen (AHORA ACTIVADO) */}
               <label 
                 htmlFor="fileUpload" 
                 className="px-3 py-2 bg-[#2e3954] text-white rounded-lg cursor-pointer hover:bg-opacity-90 transition flex items-center"

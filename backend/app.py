@@ -5,14 +5,35 @@ import jwt
 import hashlib
 from datetime import datetime, timedelta
 import db.login
-from db.mysql_connection import execute_query
+from db.mysql_connection import MySQLConnection
+
+# Importar el blueprint de bienestar
+from db.bienestar import bienestar_bp
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Configuración CORS más explícita y específica
+CORS(
+    app, 
+    resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "*"],  # Permitir localhost:3000 y fallback a todos
+            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+        }
+    },
+    supports_credentials=True # Si planeas usar cookies o sesiones con CORS
+)
 
 # Secret key for JWT tokens from config
 from db.config import get_jwt_secret
+
+# Crear instancia de conexión a BD
+db_conn = MySQLConnection()
+
+# Registrar el blueprint de bienestar con el prefijo correcto
+app.register_blueprint(bienestar_bp, url_prefix='/api/bienestar')
 
 # Authentication routes
 @app.route('/api/auth/login', methods=['POST'])
@@ -34,7 +55,7 @@ def login():
     if usuario == 'admin':
         # Consultar la contraseña almacenada
         query = "SELECT pass FROM usuarios WHERE usuario = %s"
-        result = execute_query(query, (usuario,))
+        result = db_conn.execute_query(query, (usuario,))
         if result and len(result) > 0:
             stored_pass = result[0]['pass']
             print(f"Contraseña almacenada para admin: {stored_pass}")
@@ -104,7 +125,7 @@ def list_usuarios():
     LIMIT 10
     """
     
-    usuarios = execute_query(query)
+    usuarios = db_conn.execute_query(query)
     
     if not usuarios:
         return jsonify({'message': 'No se encontraron usuarios'}), 404

@@ -3,6 +3,7 @@ Rutas para la gestión de posts del blog de bienestar.
 """
 from datetime import datetime
 from flask import request, jsonify
+import traceback # Añadido para traceback
 from ..models import post_schema, validate_post, PostStatus
 from ..queries import (
     GET_ALL_POSTS, GET_POSTS_BY_STATUS, GET_POSTS_BY_CATEGORY,
@@ -10,11 +11,15 @@ from ..queries import (
     INSERT_POST, UPDATE_POST, UPDATE_POST_STATUS, UPDATE_POST_HIGHLIGHT,
     INCREMENT_VIEWS, DELETE_POST
 )
-from ... import mysql_connection
+from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
+
+# Obtener una instancia del singleton de conexión
+db_conn = MySQLConnection()
 
 @bienestar_bp.route('/posts', methods=['GET'])
 def get_posts():
+    print("DEBUG: Iniciando get_posts()") # Log
     """
     Obtiene posts con diversos filtros.
     
@@ -34,38 +39,63 @@ def get_posts():
         destacados = request.args.get('destacados', '').lower() == 'true'
         
         posts = []
+        print(f"DEBUG: get_posts() - Filtros: status={status}, category_id={category_id}, search_term={search_term}, destacados={destacados}") # Log
         
         if destacados:
-            # Filtrar por destacados
-            posts = mysql_connection.execute_query(GET_POSTS_HIGHLIGHTED)
+            print("DEBUG: get_posts() - Obteniendo posts destacados...") # Log
+            posts = db_conn.execute_query(GET_POSTS_HIGHLIGHTED)
         elif search_term:
-            # Búsqueda por término
+            print(f"DEBUG: get_posts() - Buscando posts con término: {search_term}...") # Log
             search_param = f'%{search_term}%'
-            posts = mysql_connection.execute_query(SEARCH_POSTS, (search_param, search_param, search_param))
+            posts = db_conn.execute_query(SEARCH_POSTS, (search_param, search_param, search_param))
         elif status and status in [e.value for e in PostStatus]:
-            # Filtrar por estado
-            posts = mysql_connection.execute_query(GET_POSTS_BY_STATUS, (status,))
+            print(f"DEBUG: get_posts() - Obteniendo posts por estado: {status}...") # Log
+            posts = db_conn.execute_query(GET_POSTS_BY_STATUS, (status,))
         elif category_id and category_id.isdigit():
-            # Filtrar por categoría
-            posts = mysql_connection.execute_query(GET_POSTS_BY_CATEGORY, (int(category_id),))
+            print(f"DEBUG: get_posts() - Obteniendo posts por categoría ID: {category_id}...") # Log
+            posts = db_conn.execute_query(GET_POSTS_BY_CATEGORY, (int(category_id),))
         else:
-            # Obtener todos los posts
-            posts = mysql_connection.execute_query(GET_ALL_POSTS)
+            print("DEBUG: get_posts() - Obteniendo todos los posts (GET_ALL_POSTS)...") # Log
+            try:
+                posts = db_conn.execute_query(GET_ALL_POSTS)
+            except Exception as query_exc:
+                query_error_details = traceback.format_exc()
+                print(f"ERROR CRÍTICO durante execute_query(GET_ALL_POSTS): {str(query_exc)}\n{query_error_details}")
+                # Devolvemos un error 500 inmediatamente si la query falla aquí
+                return jsonify({
+                    'success': False,
+                    'error': f'Error crítico al ejecutar la consulta principal de posts: {str(query_exc)}',
+                    'details': query_error_details
+                }), 500
         
+        print(f"DEBUG: get_posts() - Resultado de execute_query: {type(posts)}") # Log del tipo de 'posts'
+        if posts is not None:
+            print(f"DEBUG: get_posts() - Número de posts obtenidos: {len(posts)}") # Log si no es None
+        else:
+            print("DEBUG: get_posts() - execute_query devolvió None") # Log
+
         if posts is None:
+            print("ERROR: get_posts() - execute_query devolvió None, retornando error 500.") # Log
             return jsonify({
                 'success': False,
-                'error': 'Error al obtener posts'
+                'error': 'Error crítico al obtener posts de la base de datos (query devolvió None)'
             }), 500
+        
+        print("DEBUG: get_posts() - Serializando posts con post_schema...") # Log
+        serialized_posts = [post_schema(post) for post in posts]
+        print("DEBUG: get_posts() - Serialización completada.") # Log
         
         return jsonify({
             'success': True,
-            'data': [post_schema(post) for post in posts]
+            'data': serialized_posts
         })
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en get_posts(): {str(e)}\n{error_details}") # Log detallado del error
         return jsonify({
             'success': False,
-            'error': f'Error al obtener posts: {str(e)}'
+            'error': f'Error interno del servidor al obtener posts: {str(e)}',
+            'details': error_details
         }), 500
 
 @bienestar_bp.route('/posts/<int:post_id>', methods=['GET'])
@@ -87,7 +117,7 @@ def get_post(post_id):
         increment_views = request.args.get('increment_views', '').lower() == 'true'
         
         # Obtener post
-        post_data = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        post_data = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         
         if not post_data:
             return jsonify({
@@ -97,7 +127,7 @@ def get_post(post_id):
         
         # Incrementar vistas si se ha solicitado y el post está publicado
         if increment_views and post_data[0]['estado'] == PostStatus.PUBLISHED.value:
-            mysql_connection.execute_query(INCREMENT_VIEWS, (post_id,), fetch=False)
+            db_conn.execute_query(INCREMENT_VIEWS, (post_id,), fetch=False)
             post_data[0]['vistas'] += 1
         
         return jsonify({
@@ -105,10 +135,9 @@ def get_post(post_id):
             'data': post_schema(post_data[0])
         })
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Error al obtener post: {str(e)}'
-        }), 500
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en get_post(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al obtener post {post_id}: {str(e)}'}), 500
 
 @bienestar_bp.route('/posts', methods=['POST'])
 def create_post():
@@ -137,7 +166,7 @@ def create_post():
         
         # Verificar si la categoría existe
         categoria_id = data['categoriaId']
-        categoria = mysql_connection.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,))
+        categoria = db_conn.execute_query("SELECT id FROM categorias_bienestar WHERE id = %s", (categoria_id,))
         
         if not categoria:
             return jsonify({
@@ -146,7 +175,7 @@ def create_post():
             }), 400
         
         # Insertar post
-        insert_result = mysql_connection.execute_query(
+        insert_result = db_conn.execute_query(
             INSERT_POST,
             (
                 data['titulo'],
@@ -169,7 +198,7 @@ def create_post():
             }), 500
         
         # Obtener el ID del último insert
-        last_id_result = mysql_connection.execute_query("SELECT LAST_INSERT_ID() as id")
+        last_id_result = db_conn.execute_query("SELECT LAST_INSERT_ID() as id")
         
         # Imprimir debug info
         print(f"DEBUG - last_id_result: {last_id_result}")
@@ -197,7 +226,7 @@ def create_post():
             ORDER BY created_at DESC LIMIT 1
             """
             
-            alt_result = mysql_connection.execute_query(alt_query, (
+            alt_result = db_conn.execute_query(alt_query, (
                 data['titulo'],
                 data['extracto'],
                 data['autor']
@@ -210,7 +239,7 @@ def create_post():
                 print(f"DEBUG - ID alternativo encontrado: {last_id}")
         
         # Obtener el post recién creado
-        new_post = mysql_connection.execute_query(GET_POST_BY_ID, (last_id,))
+        new_post = db_conn.execute_query(GET_POST_BY_ID, (last_id,))
         
         # Imprimir debug info
         print(f"DEBUG - new_post: {new_post}")
@@ -233,13 +262,9 @@ def create_post():
         }), 201
         
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        print(f"Error al crear post: {str(e)}\n{error_trace}")
-        return jsonify({
-            'success': False,
-            'error': f'Error al crear post: {str(e)}'
-        }), 500
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en create_post: {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al crear post: {str(e)}'}), 500
 
 @bienestar_bp.route('/posts/<int:post_id>', methods=['PUT'])
 def update_post(post_id):
@@ -264,7 +289,7 @@ def update_post(post_id):
             }), 400
         
         # Verificar si existe el post
-        existing = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -277,7 +302,7 @@ def update_post(post_id):
         imagen_url = data.get('imagenUrl', existing[0]['imagen_url'])
         
         # Actualizar post
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             UPDATE_POST,
             (
                 data['titulo'],
@@ -300,7 +325,7 @@ def update_post(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -309,10 +334,9 @@ def update_post(post_id):
         })
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Error al actualizar post: {str(e)}'
-        }), 500
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en update_post(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al actualizar post {post_id}: {str(e)}'}), 500
 
 @bienestar_bp.route('/posts/<int:post_id>/status', methods=['PATCH'])
 def change_post_status(post_id):
@@ -344,7 +368,7 @@ def change_post_status(post_id):
             }), 400
         
         # Verificar si existe el post
-        existing = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -352,7 +376,7 @@ def change_post_status(post_id):
             }), 404
         
         # Actualizar estado
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             UPDATE_POST_STATUS,
             (new_status, post_id),
             fetch=False
@@ -365,7 +389,7 @@ def change_post_status(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -374,10 +398,9 @@ def change_post_status(post_id):
         })
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Error al actualizar estado del post: {str(e)}'
-        }), 500
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en change_post_status(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al cambiar estado del post {post_id}: {str(e)}'}), 500
 
 @bienestar_bp.route('/posts/<int:post_id>/highlight', methods=['PATCH'])
 def toggle_post_highlight(post_id):
@@ -394,7 +417,7 @@ def toggle_post_highlight(post_id):
         data = request.json
         
         # Verificar si existe el post
-        existing = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -409,7 +432,7 @@ def toggle_post_highlight(post_id):
             new_highlight = bool(data['destacado'])
         
         # Actualizar destacado
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             UPDATE_POST_HIGHLIGHT,
             (new_highlight, post_id),
             fetch=False
@@ -422,7 +445,7 @@ def toggle_post_highlight(post_id):
             }), 500
         
         # Obtener el post actualizado
-        updated_post = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        updated_post = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         
         return jsonify({
             'success': True,
@@ -431,10 +454,9 @@ def toggle_post_highlight(post_id):
         })
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Error al actualizar estado destacado del post: {str(e)}'
-        }), 500
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en toggle_post_highlight(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al destacar post {post_id}: {str(e)}'}), 500
 
 @bienestar_bp.route('/posts/<int:post_id>', methods=['DELETE'])
 def delete_post(post_id):
@@ -449,7 +471,7 @@ def delete_post(post_id):
     """
     try:
         # Verificar si existe el post
-        existing = mysql_connection.execute_query(GET_POST_BY_ID, (post_id,))
+        existing = db_conn.execute_query(GET_POST_BY_ID, (post_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -457,7 +479,7 @@ def delete_post(post_id):
             }), 404
         
         # Eliminar post
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             DELETE_POST,
             (post_id,),
             fetch=False
@@ -475,7 +497,6 @@ def delete_post(post_id):
         })
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Error al eliminar post: {str(e)}'
-        }), 500 
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en delete_post(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al eliminar post {post_id}: {str(e)}'}), 500 

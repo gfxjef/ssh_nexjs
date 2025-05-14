@@ -5,8 +5,10 @@ Proporciona funciones para login, verificación de tokens y gestión de sesiones
 import jwt
 import hashlib
 from datetime import datetime, timedelta
-from ..mysql_connection import execute_query
+from ..mysql_connection import MySQLConnection
 from ..config import get_jwt_secret
+
+db_conn = MySQLConnection()
 
 def hash_password(password):
     """
@@ -98,7 +100,7 @@ def login_usuario(usuario, password):
     WHERE (usuario = %s OR correo = %s)
     """
     
-    users = execute_query(query, (usuario, usuario))
+    users = db_conn.execute_query(query, (usuario, usuario))
     
     if not users or len(users) == 0:
         print(f"No se encontró usuario con nombre/correo: {usuario}")
@@ -154,7 +156,7 @@ def obtener_usuario_por_id(usuario_id):
     WHERE id = %s
     """
     
-    users = execute_query(query, (usuario_id,))
+    users = db_conn.execute_query(query, (usuario_id,))
     
     if not users or len(users) == 0:
         return None
@@ -177,7 +179,7 @@ def verificar_tabla_usuarios():
     AND table_name = 'usuarios'
     """
     
-    table_exists = execute_query(check_table_query)
+    table_exists = db_conn.execute_query(check_table_query)
     
     if not table_exists or table_exists[0]['existe'] == 0:
         return {
@@ -194,7 +196,7 @@ def verificar_tabla_usuarios():
     ORDER BY ORDINAL_POSITION
     """
     
-    columns_data = execute_query(columns_query)
+    columns_data = db_conn.execute_query(columns_query)
     
     # Convertir objetos que puedan ser bytes a str para la serialización JSON
     columns = []
@@ -211,7 +213,7 @@ def verificar_tabla_usuarios():
     
     # Contar registros
     count_query = "SELECT COUNT(*) as total FROM usuarios"
-    count_result = execute_query(count_query)
+    count_result = db_conn.execute_query(count_query)
     total_users = count_result[0]['total'] if count_result else 0
     
     return {

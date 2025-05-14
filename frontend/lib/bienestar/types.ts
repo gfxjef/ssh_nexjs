@@ -37,6 +37,7 @@ export interface PostFilters {
   search?: string;
   category?: string | number | 'todas';
   sortBy?: PostSort;
+  destacados?: boolean; // Añadido para el filtro de posts destacados
 }
 
 // Configuración visual para los estados

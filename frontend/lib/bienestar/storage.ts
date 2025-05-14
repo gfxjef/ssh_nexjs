@@ -9,275 +9,210 @@ import { Post, Category, PostStatus } from './types';
 const POSTS_STORAGE_KEY = 'bienestar_posts';
 const CATEGORIES_STORAGE_KEY = 'bienestar_categories';
 
-// Datos iniciales de ejemplo para categorías
-const initialCategories: Category[] = [
-  { id: 1, nombre: 'Tecnología', color: '#2e3954' },
-  { id: 2, nombre: 'Desarrollo', color: '#8dbba3' },
-  { id: 3, nombre: 'Diseño', color: '#d48b45' },
-  { id: 4, nombre: 'Bienestar', color: '#6366f1' },
-  { id: 5, nombre: 'Eventos', color: '#f59e0b' }
-];
+// // Datos iniciales de ejemplo para categorías (COMENTADO - Ya no se usa para inicialización directa aquí)
+// const initialCategories: Category[] = [
+//   { id: 1, nombre: 'Tecnología', color: '#2e3954' },
+//   { id: 2, nombre: 'Desarrollo', color: '#8dbba3' },
+//   { id: 3, nombre: 'Diseño', color: '#d48b45' },
+//   { id: 4, nombre: 'Bienestar', color: '#6366f1' },
+//   { id: 5, nombre: 'Eventos', color: '#f59e0b' }
+// ];
 
-// Datos iniciales de ejemplo para posts
-const initialPosts: Post[] = [
-  {
-    id: 1,
-    titulo: 'Cómo implementar autenticación en NextJS',
-    extracto: 'Una guía paso a paso para implementar autenticación segura en tus aplicaciones web...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Tecnología',
-    categoriaId: 1,
-    fecha: '2023-06-02',
-    autor: 'Ana Martínez',
-    vistas: 1240,
-    estado: 'publicado',
-    destacado: true,
-    imagenUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop'
-  },
-  {
-    id: 2,
-    titulo: 'Los mejores hooks personalizados para React',
-    extracto: 'Optimiza tu código y mejora la reutilización con estos hooks personalizados...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Desarrollo',
-    categoriaId: 2,
-    fecha: '2023-05-28',
-    autor: 'Pedro Sánchez',
-    vistas: 985,
-    estado: 'publicado',
-    destacado: false,
-    imagenUrl: 'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=800&auto=format&fit=crop'
-  },
-  {
-    id: 3,
-    titulo: 'Principios de diseño UI/UX para desarrolladores',
-    extracto: 'Aprende los fundamentos de diseño que todo desarrollador debería conocer...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Diseño',
-    categoriaId: 3,
-    fecha: '2023-05-20',
-    autor: 'Lucía Rodríguez',
-    vistas: 762,
-    estado: 'borrador',
-    destacado: false,
-    imagenUrl: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop'
-  },
-  {
-    id: 4,
-    titulo: '5 Ejercicios para prevenir lesiones por uso de computadora',
-    extracto: 'Mantén tu cuerpo sano con estos ejercicios mientras trabajas muchas horas frente a la computadora...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Bienestar',
-    categoriaId: 4,
-    fecha: '2023-05-15',
-    autor: 'Martín García',
-    vistas: 542,
-    estado: 'publicado',
-    destacado: false,
-    imagenUrl: 'https://images.unsplash.com/photo-1579126038374-6064e9370f0f?w=800&auto=format&fit=crop'
-  },
-  {
-    id: 5,
-    titulo: 'Nextjs 13: Novedades y mejoras en el framework',
-    extracto: 'Descubre las nuevas características y mejoras de rendimiento que trae la versión 13 de Next.js...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Tecnología',
-    categoriaId: 1,
-    fecha: '2023-05-12',
-    autor: 'Carlos Vega',
-    vistas: 1576,
-    estado: 'borrador',
-    destacado: true,
-    imagenUrl: 'https://images.unsplash.com/photo-1556075798-4825dfaaf498?w=800&auto=format&fit=crop'
-  },
-  {
-    id: 6,
-    titulo: 'Automatiza tus pruebas con Jest y Testing Library',
-    extracto: 'Aprende a configurar y usar estas potentes herramientas para pruebas automatizadas...',
-    contenido: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl. Nullam euismod, nisl eget aliquam ultricies, nunc nisl aliquet nunc, quis aliquam nisl nunc eu nisl.',
-    categoria: 'Desarrollo',
-    categoriaId: 2,
-    fecha: '2023-05-08',
-    autor: 'Sandra Morales',
-    vistas: 892,
-    estado: 'archivado',
-    destacado: false,
-    imagenUrl: 'https://images.unsplash.com/photo-1614741118887-7a4ee193a5fa?w=800&auto=format&fit=crop'
-  }
-];
+// // Datos iniciales de ejemplo para posts (COMENTADO - Ya no se usa para inicialización directa aquí)
+// const initialPosts: Post[] = [
+//   // ... (datos de posts comentados para brevedad, ya no se usan aquí)
+// ];
 
 /**
- * Inicializa el almacenamiento local si no existe
+ * Inicializa el almacenamiento local si no existe (NEUTRALIZADA)
  */
 export function initializeStorage(forceReset = false): void {
-  // Si se fuerza el reset o no hay datos en localStorage, inicializar
-  if (forceReset || !localStorage.getItem(CATEGORIES_STORAGE_KEY)) {
-    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(initialCategories));
-  }
-  
-  if (forceReset || !localStorage.getItem(POSTS_STORAGE_KEY)) {
-    localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(initialPosts));
-  }
+  console.log(`NEUTRALIZADO: initializeStorage llamado con forceReset=${forceReset}. No se interactúa con localStorage.`);
+  // if (forceReset || !localStorage.getItem(CATEGORIES_STORAGE_KEY)) {
+  //   localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(initialCategories));
+  // }
+  // if (forceReset || !localStorage.getItem(POSTS_STORAGE_KEY)) {
+  //   localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(initialPosts));
+  // }
 }
 
 /**
- * Limpia todos los datos almacenados
+ * Limpia todos los datos almacenados (NEUTRALIZADA)
  */
 export function clearStorage(): void {
-  localStorage.removeItem(POSTS_STORAGE_KEY);
-  localStorage.removeItem(CATEGORIES_STORAGE_KEY);
+  console.log("NEUTRALIZADO: clearStorage llamado. No se interactúa con localStorage.");
+  // localStorage.removeItem(POSTS_STORAGE_KEY);
+  // localStorage.removeItem(CATEGORIES_STORAGE_KEY);
 }
 
 /**
- * MÉTODOS PARA POSTS
+ * MÉTODOS PARA POSTS (NEUTRALIZADOS)
  */
 
 /**
- * Carga todos los posts desde localStorage
+ * Carga todos los posts desde localStorage (NEUTRALIZADA)
  */
 export function loadPosts(): Post[] {
-  try {
-    const data = localStorage.getItem(POSTS_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error loading posts:', error);
-    return [];
-  }
+  console.log("NEUTRALIZADO: loadPosts llamado. Devuelve array vacío. Usar mock data del contexto.");
+  // try {
+  //   const data = localStorage.getItem(POSTS_STORAGE_KEY);
+  //   return data ? JSON.parse(data) : [];
+  // } catch (error) {
+  //   console.error('Error loading posts:', error);
+  //   return [];
+  // }
+  return [];
 }
 
 /**
- * Guarda todos los posts en localStorage
+ * Guarda todos los posts en localStorage (NEUTRALIZADA)
  */
 export function savePosts(posts: Post[]): void {
-  try {
-    localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(posts));
-  } catch (error) {
-    console.error('Error saving posts:', error);
-  }
+  console.log("NEUTRALIZADO: savePosts llamado. No se interactúa con localStorage.");
+  // try {
+  //   localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(posts));
+  // } catch (error) {
+  //   console.error('Error saving posts:', error);
+  // }
 }
 
 /**
- * Obtiene un post por su ID
+ * Obtiene un post por su ID (NEUTRALIZADA)
  */
 export function getPostById(id: number): Post | undefined {
-  const posts = loadPosts();
-  return posts.find(post => post.id === id);
+  console.log(`NEUTRALIZADO: getPostById llamado con ID ${id}. Devuelve undefined. Usar mock data del contexto.`);
+  // const posts = loadPosts(); // No llamar a la versión neutralizada de loadPosts aquí
+  // return posts.find(post => post.id === id);
+  return undefined;
 }
 
 /**
- * Agrega un nuevo post
+ * Agrega un nuevo post (NEUTRALIZADA)
  */
 export function addPost(post: Omit<Post, 'id'>): Post {
-  const posts = loadPosts();
-  
-  // Generar un nuevo ID único
-  const newId = posts.length > 0 
-    ? Math.max(...posts.map(p => p.id)) + 1 
-    : 1;
-  
-  const newPost: Post = {
+  console.log("NEUTRALIZADO: addPost llamado. No se interactúa con localStorage. Devuelve post de entrada con ID temporal.");
+  // const posts = loadPosts();
+  // const newId = posts.length > 0 
+  //   ? Math.max(...posts.map(p => p.id)) + 1 
+  //   : 1;
+  const newMockPost: Post = {
     ...post,
-    id: newId,
+    id: Date.now(), // ID temporal
     fecha: post.fecha || new Date().toISOString().split('T')[0],
     vistas: post.vistas || 0
   };
-  
-  posts.push(newPost);
-  savePosts(posts);
-  
-  return newPost;
+  // posts.push(newMockPost);
+  // savePosts(posts);
+  return newMockPost; // Devuelve el post con un ID mock para que la UI no rompa si espera un objeto Post
 }
 
 /**
- * Actualiza un post existente
+ * Actualiza un post existente (NEUTRALIZADA)
  */
 export function updatePost(id: number, updates: Partial<Post>): Post | null {
-  const posts = loadPosts();
-  const index = posts.findIndex(post => post.id === id);
+  console.log(`NEUTRALIZADO: updatePost llamado para ID ${id}. No se interactúa con localStorage. Devuelve null o post actualizado mock.`);
+  // const posts = loadPosts();
+  // const index = posts.findIndex(post => post.id === id);
+  // if (index === -1) {
+  //   return null;
+  // }
+  // const updatedPost = { ...posts[index], ...updates };
+  // posts[index] = updatedPost;
+  // savePosts(posts);
+  // return updatedPost;
   
-  if (index === -1) {
-    return null;
+  // Para simular una actualización para la UI si es necesario, sin tocar localStorage
+  const mockExistingPost = getPostById(id); // Usa la versión neutralizada que devuelve undefined
+  if (mockExistingPost) {
+    return { ...mockExistingPost, ...updates } as Post;
   }
-  
-  const updatedPost = { ...posts[index], ...updates };
-  posts[index] = updatedPost;
-  savePosts(posts);
-  
-  return updatedPost;
+  return null;
 }
 
 /**
- * Elimina un post por su ID
+ * Elimina un post por su ID (NEUTRALIZADA)
  */
 export function deletePost(id: number): boolean {
-  const posts = loadPosts();
-  const filteredPosts = posts.filter(post => post.id !== id);
-  
-  if (filteredPosts.length === posts.length) {
-    return false; // No se encontró el post con el ID proporcionado
-  }
-  
-  savePosts(filteredPosts);
-  return true;
+  console.log(`NEUTRALIZADO: deletePost llamado para ID ${id}. No se interactúa con localStorage. Devuelve true como simulación.`);
+  // const posts = loadPosts();
+  // const filteredPosts = posts.filter(post => post.id !== id);
+  // if (filteredPosts.length === posts.length) {
+  //   return false; 
+  // }
+  // savePosts(filteredPosts);
+  return true; // Simula éxito
 }
 
 /**
- * Cambia el estado de un post
+ * Cambia el estado de un post (NEUTRALIZADA)
  */
 export function changePostStatus(id: number, status: PostStatus): Post | null {
-  return updatePost(id, { estado: status });
+  console.log(`NEUTRALIZADO: changePostStatus llamado para ID ${id} a estado ${status}. Devuelve null o post actualizado mock.`);
+  // return updatePost(id, { estado: status }); 
+  const mockUpdatedPost = updatePost(id, { estado: status }); // Llama a la versión neutralizada de updatePost
+  return mockUpdatedPost;
 }
 
 /**
- * Cambia el valor destacado de un post
+ * Cambia el valor destacado de un post (NEUTRALIZADA)
  */
 export function togglePostHighlight(id: number): Post | null {
-  const post = getPostById(id);
-  if (!post) return null;
-  
-  return updatePost(id, { destacado: !post.destacado });
+  console.log(`NEUTRALIZADO: togglePostHighlight llamado para ID ${id}. Devuelve null o post actualizado mock.`);
+  // const post = getPostById(id); // Usa la versión neutralizada
+  // if (!post) return null;
+  // return updatePost(id, { destacado: !post.destacado });
+  const mockPost = getPostById(id); // Usa la versión neutralizada
+   if (!mockPost) return null;
+  return updatePost(id, { destacado: !mockPost.destacado }); // Llama a la versión neutralizada de updatePost
 }
 
 /**
- * MÉTODOS PARA CATEGORÍAS
+ * MÉTODOS PARA CATEGORÍAS (NEUTRALIZADOS)
  */
 
 /**
- * Carga todas las categorías desde localStorage
+ * Carga todas las categorías desde localStorage (NEUTRALIZADA)
  */
 export function loadCategories(): Category[] {
-  try {
-    const data = localStorage.getItem(CATEGORIES_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error loading categories:', error);
-    return [];
-  }
+  console.log("NEUTRALIZADO: loadCategories llamado. Devuelve array vacío. Usar mock data del contexto.");
+  // try {
+  //   const data = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+  //   return data ? JSON.parse(data) : [];
+  // } catch (error) {
+  //   console.error('Error loading categories:', error);
+  //   return [];
+  // }
+  return [];
 }
 
 /**
- * Guarda todas las categorías en localStorage
+ * Guarda todas las categorías en localStorage (NEUTRALIZADA)
  */
 export function saveCategories(categories: Category[]): void {
-  try {
-    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-  } catch (error) {
-    console.error('Error saving categories:', error);
-  }
+  console.log("NEUTRALIZADO: saveCategories llamado. No se interactúa con localStorage.");
+  // try {
+  //   localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+  // } catch (error) {
+  //   console.error('Error saving categories:', error);
+  // }
 }
 
 /**
- * Obtiene una categoría por su ID
+ * Obtiene una categoría por su ID (NEUTRALIZADA)
  */
 export function getCategoryById(id: number): Category | undefined {
-  const categories = loadCategories();
-  return categories.find(category => category.id === id);
+  console.log(`NEUTRALIZADO: getCategoryById llamado para ID ${id}. Devuelve undefined. Usar mock data del contexto.`);
+  // const categories = loadCategories(); // No llamar a la versión neutralizada
+  // return categories.find(category => category.id === id);
+  return undefined;
 }
 
 /**
- * Obtiene una categoría por su nombre
+ * Obtiene una categoría por su nombre (NEUTRALIZADA)
  */
 export function getCategoryByName(name: string): Category | undefined {
-  const categories = loadCategories();
-  return categories.find(category => category.nombre.toLowerCase() === name.toLowerCase());
+  console.log(`NEUTRALIZADO: getCategoryByName llamado para nombre ${name}. Devuelve undefined. Usar mock data del contexto.`);
+  // const categories = loadCategories(); // No llamar a la versión neutralizada
+  // return categories.find(category => category.nombre.toLowerCase() === name.toLowerCase());
+  return undefined;
 } 

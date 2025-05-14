@@ -2,16 +2,21 @@
 Rutas para la gestión de categorías del blog de bienestar.
 """
 from flask import request, jsonify
+import traceback # Añadido para traceback
 from ..models import category_schema, validate_category
 from ..queries import (
     GET_ALL_CATEGORIES, GET_CATEGORY_BY_ID, GET_CATEGORY_BY_NAME,
     INSERT_CATEGORY, UPDATE_CATEGORY, DELETE_CATEGORY
 )
-from ... import mysql_connection
+from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
+
+# Obtener una instancia del singleton de conexión
+db_conn = MySQLConnection()
 
 @bienestar_bp.route('/categories', methods=['GET'])
 def get_categories():
+    print("DEBUG: Iniciando get_categories()") # Log
     """
     Obtiene todas las categorías.
     
@@ -19,22 +24,47 @@ def get_categories():
         json: Lista de categorías
     """
     try:
-        categories = mysql_connection.execute_query(GET_ALL_CATEGORIES)
-        
-        if categories is None:
+        print("DEBUG: get_categories() - Obteniendo todas las categorías (GET_ALL_CATEGORIES)...") # Log
+        try:
+            categories = db_conn.execute_query(GET_ALL_CATEGORIES)
+        except Exception as query_exc:
+            query_error_details = traceback.format_exc()
+            print(f"ERROR CRÍTICO durante execute_query(GET_ALL_CATEGORIES): {str(query_exc)}\n{query_error_details}")
+            # Devolvemos un error 500 inmediatamente si la query falla aquí
             return jsonify({
                 'success': False,
-                'error': 'Error al obtener categorías'
+                'error': f'Error crítico al ejecutar la consulta principal de categorías: {str(query_exc)}',
+                'details': query_error_details
             }), 500
+        
+        print(f"DEBUG: get_categories() - Resultado de execute_query: {type(categories)}") # Log del tipo
+        if categories is not None:
+            print(f"DEBUG: get_categories() - Número de categorías obtenidas: {len(categories)}") # Log
+        else:
+            print("DEBUG: get_categories() - execute_query devolvió None") # Log
+
+        if categories is None:
+            print("ERROR: get_categories() - execute_query devolvió None, retornando error 500.") # Log
+            return jsonify({
+                'success': False,
+                'error': 'Error crítico al obtener categorías de la base de datos (query devolvió None)'
+            }), 500
+
+        print("DEBUG: get_categories() - Serializando categorías con category_schema...") # Log
+        serialized_categories = [category_schema(category) for category in categories]
+        print("DEBUG: get_categories() - Serialización completada.") # Log
         
         return jsonify({
             'success': True,
-            'data': [category_schema(category) for category in categories]
+            'data': serialized_categories
         })
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en get_categories(): {str(e)}\n{error_details}") # Log detallado
         return jsonify({
             'success': False,
-            'error': f'Error al obtener categorías: {str(e)}'
+            'error': f'Error interno del servidor al obtener categorías: {str(e)}',
+            'details': error_details
         }), 500
 
 @bienestar_bp.route('/categories/<int:category_id>', methods=['GET'])
@@ -49,7 +79,7 @@ def get_category(category_id):
         json: Categoría encontrada o error
     """
     try:
-        category = mysql_connection.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        category = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         
         if not category:
             return jsonify({
@@ -62,9 +92,11 @@ def get_category(category_id):
             'data': category_schema(category[0])
         })
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en get_category(id={category_id}): {str(e)}\n{error_details}")
         return jsonify({
             'success': False,
-            'error': f'Error al obtener categoría: {str(e)}'
+            'error': f'Error al obtener categoría {category_id}: {str(e)}'
         }), 500
 
 @bienestar_bp.route('/categories', methods=['POST'])
@@ -87,7 +119,7 @@ def create_category():
             }), 400
         
         # Verificar si ya existe una categoría con el mismo nombre
-        existing = mysql_connection.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        existing = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         if existing:
             return jsonify({
                 'success': False,
@@ -95,7 +127,7 @@ def create_category():
             }), 400
         
         # Insertar categoría
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             INSERT_CATEGORY, 
             (data['nombre'], data.get('color', '#2e3954')),
             fetch=False
@@ -108,7 +140,7 @@ def create_category():
             }), 500
         
         # Obtener la categoría recién creada
-        new_category = mysql_connection.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        new_category = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         
         return jsonify({
             'success': True,
@@ -117,13 +149,15 @@ def create_category():
         }), 201
         
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en create_category: {str(e)}\n{error_details}")
         return jsonify({
             'success': False,
             'error': f'Error al crear categoría: {str(e)}'
         }), 500
 
 @bienestar_bp.route('/categories/<int:category_id>', methods=['PUT'])
-def update_category(category_id):
+def update_category_route(category_id): # Renombrado para evitar conflicto
     """
     Actualiza una categoría existente.
     
@@ -145,7 +179,7 @@ def update_category(category_id):
             }), 400
         
         # Verificar si existe la categoría
-        existing = mysql_connection.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        existing = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -153,7 +187,7 @@ def update_category(category_id):
             }), 404
         
         # Verificar si ya existe otra categoría con el mismo nombre
-        name_check = mysql_connection.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
+        name_check = db_conn.execute_query(GET_CATEGORY_BY_NAME, (data['nombre'],))
         if name_check and name_check[0]['id'] != category_id:
             return jsonify({
                 'success': False,
@@ -161,7 +195,7 @@ def update_category(category_id):
             }), 400
         
         # Actualizar categoría
-        result = mysql_connection.execute_query(
+        result = db_conn.execute_query(
             UPDATE_CATEGORY,
             (data['nombre'], data.get('color', '#2e3954'), category_id),
             fetch=False
@@ -174,7 +208,7 @@ def update_category(category_id):
             }), 500
         
         # Obtener la categoría actualizada
-        updated_category = mysql_connection.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        updated_category = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         
         return jsonify({
             'success': True,
@@ -183,13 +217,15 @@ def update_category(category_id):
         })
         
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en update_category(id={category_id}): {str(e)}\n{error_details}")
         return jsonify({
             'success': False,
-            'error': f'Error al actualizar categoría: {str(e)}'
+            'error': f'Error al actualizar categoría {category_id}: {str(e)}'
         }), 500
 
 @bienestar_bp.route('/categories/<int:category_id>', methods=['DELETE'])
-def delete_category(category_id):
+def delete_category_route(category_id): # Renombrado
     """
     Elimina una categoría.
     
@@ -201,7 +237,7 @@ def delete_category(category_id):
     """
     try:
         # Verificar si existe la categoría
-        existing = mysql_connection.execute_query(GET_CATEGORY_BY_ID, (category_id,))
+        existing = db_conn.execute_query(GET_CATEGORY_BY_ID, (category_id,))
         if not existing:
             return jsonify({
                 'success': False,
@@ -212,7 +248,7 @@ def delete_category(category_id):
         # Este bloque debería implementarse para evitar borrar categorías en uso
         
         # Eliminar categoría
-        result = mysql_connection.execute_query(DELETE_CATEGORY, (category_id,), fetch=False)
+        result = db_conn.execute_query(DELETE_CATEGORY, (category_id,), fetch=False)
         
         if not result or 'affected_rows' not in result or result['affected_rows'] == 0:
             return jsonify({
@@ -226,7 +262,9 @@ def delete_category(category_id):
         })
         
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en delete_category(id={category_id}): {str(e)}\n{error_details}")
         return jsonify({
             'success': False,
-            'error': f'Error al eliminar categoría: {str(e)}'
+            'error': f'Error al eliminar categoría {category_id}: {str(e)}'
         }), 500 
