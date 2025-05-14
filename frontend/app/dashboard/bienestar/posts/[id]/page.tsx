@@ -11,74 +11,71 @@ export default function PostDetail() {
   const params = useParams();
   const router = useRouter();
   
-  // Estado para postId, inicializado como null o un número
-  const [postId, setPostId] = useState<number | null>(null);
+  const { getPostById, getCategoryById, loading: contextLoading, posts: allPostsFromContext } = usePosts();
   
-  const { getPostById, getCategoryById, loading: contextLoading } = usePosts();
-  // Inicializamos el estado con tipo Post | undefined
-  const [post, setPost] = useState<Post | undefined>(undefined);
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
+  const [currentPost, setCurrentPost] = useState<Post | undefined | null>(undefined); // undefined: aún no buscado, null: no encontrado
+  const [pageLoading, setPageLoading] = useState(true);
   
-  // Obtenemos el post usando useEffect para evitar la actualización durante el renderizado
   useEffect(() => {
-    // Primero, procesamos params.id
-    if (params && typeof params.id === 'string') {
-      const numericId = Number(params.id);
-      if (!isNaN(numericId) && numericId > 0) {
-        setPostId(numericId);
-      } else {
-        console.error("ID de post no válido:", params.id);
-        setIsLoadingPage(false); 
-        setPost(undefined); 
-        return;
-      }
-    } else if (params) { 
-        console.error("params.id no es una cadena o no existe:", params);
-        setIsLoadingPage(false);
-        setPost(undefined);
-        return;
-    }
-    // Si params es null, esperamos a que se popule, no hacemos nada aquí
-  }, [params, router]);
+    console.log("PostDetail EFFECT: Ejecutándose. Params:", params, "ContextLoading:", contextLoading);
+    setPageLoading(true); // Siempre empezamos asumiendo que cargaremos algo o decidiremos.
 
-  useEffect(() => {
-    const fetchPost = () => {
-      if (postId && postId > 0) {
-        console.log(`PostDetail: Intentando obtener post con ID: ${postId}`);
-        const postData = getPostById(postId);
-        setPost(postData);
+    if (!params || typeof params.id !== 'string') {
+      // Si params no está listo o id no es string, esperamos.
+      // Si params.id es explícitamente undefined después de que params está disponible, es un problema.
+      if (params && params.id === undefined) {
+        console.error("PostDetail EFFECT: params.id es undefined.");
+        setCurrentPost(null); // Marcar como no encontrado/inválido
+        setPageLoading(false);
       }
-      // Marcamos la carga de la página como completada solo después de intentar obtener el post
-      setIsLoadingPage(false); 
-    };
-    
-    // Solo intentar cargar el post si el contexto NO está cargando y ya hemos procesado params
-    if (!contextLoading && params) {
-        fetchPost();
-    } else if (params) {
-        // Si el contexto está cargando pero ya tenemos params, aún consideramos que la página está cargando
-        setIsLoadingPage(true);
+      // Si !params, el efecto se re-ejecutará cuando params cambie.
+      return;
     }
-  }, [postId, getPostById, contextLoading, params]);
-  
-  // Si no se encontró el post, redirigir a la lista de posts
+
+    const numericId = Number(params.id);
+
+    if (isNaN(numericId) || numericId <= 0) {
+      console.error("PostDetail EFFECT: ID de post no válido:", params.id);
+      setCurrentPost(null); // Marcar como no encontrado/inválido
+      setPageLoading(false);
+      return;
+    }
+
+    // En este punto, tenemos un numericId válido.
+    console.log(`PostDetail EFFECT: ID numérico válido: ${numericId}`);
+
+    if (contextLoading) {
+      console.log("PostDetail EFFECT: Contexto aún cargando. Esperando...");
+      // Mantenemos pageLoading en true, el efecto se re-ejecutará cuando contextLoading cambie.
+      return;
+    }
+
+    // El contexto está listo y tenemos un ID numérico válido.
+    console.log(`PostDetail EFFECT: Contexto listo. Buscando post ID: ${numericId}`);
+    const postData = getPostById(numericId);
+    
+    if (postData) {
+      console.log(`PostDetail EFFECT: Post ID ${numericId} ENCONTRADO en contexto.`);
+      setCurrentPost(postData);
+    } else {
+      console.log(`PostDetail EFFECT: Post ID ${numericId} NO ENCONTRADO en contexto.`);
+      setCurrentPost(null); // Marcar como no encontrado
+    }
+    setPageLoading(false);
+
+  }, [params, contextLoading, getPostById, allPostsFromContext]); // allPostsFromContext añadido por si getPostById depende de su referencia estable o contenido directo
+
+  // Redirección si el post no se encontró (currentPost es null) y no estamos cargando
   useEffect(() => {
-    // Redirigir solo si:
-    // 1. Los parámetros de la URL (params) han sido procesados.
-    // 2. La carga específica de esta página (isLoadingPage) ha terminado.
-    // 3. El contexto de posts (contextLoading) ha terminado de cargar.
-    // 4. El post sigue sin encontrarse (post es undefined).
-    // 5. Se intentó establecer un postId (postId no es null).
-    if (params && !isLoadingPage && !contextLoading && !post && postId !== null) { 
-      console.log(`PostDetail: Post ID ${postId} no encontrado o inválido tras carga de contexto, redirigiendo...`);
+    if (!pageLoading && currentPost === null) {
+      console.log("PostDetail REDIRECT EFFECT: currentPost es null y no estamos cargando. Redirigiendo...");
       router.push('/dashboard/bienestar/posts');
     }
-  }, [post, contextLoading, isLoadingPage, router, postId, params]);
-  
+  }, [pageLoading, currentPost, router]);
+
   // Formatear fecha
   const formatearFecha = (fechaString: string) => {
     if (!fechaString) return '';
-    
     const fecha = new Date(fechaString);
     return fecha.toLocaleDateString('es-ES', {
       day: 'numeric',
@@ -87,24 +84,41 @@ export default function PostDetail() {
     });
   };
   
-  // Si está cargando el contexto o la página, o no se encuentra el post
-  if (contextLoading || isLoadingPage || !post) {
+  // Si está cargando la página, o no se ha determinado si el post existe
+  if (pageLoading || currentPost === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954]"></div>
       </div>
     );
   }
+
+  // Si después de cargar, el post es null (no encontrado)
+  // Esta condición podría no alcanzarse si la redirección del useEffect anterior es más rápida.
+  // Pero es una salvaguarda.
+  if (currentPost === null) {
+     // Ya se debería haber redirigido. Si llegamos aquí, es un estado inesperado,
+     // pero mostramos un mensaje de error o un loader antes de la redirección final.
+    console.log("PostDetail RENDER: currentPost es null, pero no se redirigió aún. Mostrando loader.");
+    return (
+      <div className="container mx-auto px-4 py-8 flex justify-center items-center h-96">
+        <div className="text-center">
+          <p className="text-xl text-gray-700">Post no encontrado. Serás redirigido...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954] mx-auto mt-4"></div>
+        </div>
+      </div>
+    );
+  }
   
-  // Obtener la categoría
-  const category = getCategoryById(post.categoriaId);
+  // Si llegamos aquí, tenemos un post válido en currentPost
+  const postToRender = currentPost;
+  const category = getCategoryById(postToRender.categoriaId);
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto">
         <Notifications />
         
-        {/* Botón de regreso */}
         <button 
           onClick={() => router.back()}
           className="mb-6 flex items-center text-[#2e3954] hover:underline"
@@ -115,17 +129,15 @@ export default function PostDetail() {
           Volver a Posts
         </button>
         
-        {/* Imagen destacada */}
-        {post.imagenUrl && (
+        {postToRender.imagenUrl && (
           <div className="h-64 md:h-96 bg-gray-200 relative rounded-lg overflow-hidden mb-6">
             <div 
               className="absolute inset-0 bg-cover bg-center" 
-              style={{ backgroundImage: `url(${post.imagenUrl})` }}
+              style={{ backgroundImage: `url(${postToRender.imagenUrl})` }}
             />
           </div>
         )}
         
-        {/* Cabecera del post */}
         <div className="mb-8">
           <div className="flex flex-wrap justify-between items-center mb-4">
             <div className="flex items-center space-x-3">
@@ -135,7 +147,7 @@ export default function PostDetail() {
                   className="text-sm"
                 />
               )}
-              {post.destacado && (
+              {postToRender.destacado && (
                 <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
                   <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -145,26 +157,25 @@ export default function PostDetail() {
               )}
             </div>
             <div className="text-sm text-gray-600">
-              {formatearFecha(post.fecha)}
+              {formatearFecha(postToRender.fecha)}
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold text-[#2e3954] mb-4">{post.titulo}</h1>
+          <h1 className="text-3xl font-bold text-[#2e3954] mb-4">{postToRender.titulo}</h1>
           
           <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-            <div>Por <span className="font-medium">{post.autor}</span></div>
-            <div>{post.vistas.toLocaleString()} lecturas</div>
+            <div>Por <span className="font-medium">{postToRender.autor}</span></div>
+            <div>{postToRender.vistas.toLocaleString()} lecturas</div>
           </div>
           
           <p className="text-lg text-gray-700 italic border-l-4 border-[#2e3954] pl-4 py-2 bg-gray-50 rounded-sm">
-            {post.extracto}
+            {postToRender.extracto}
           </p>
         </div>
         
-        {/* Contenido del post */}
         <div className="prose prose-lg max-w-none text-gray-800">
-          {post.contenido ? (
-            <div className="text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: post.contenido }}></div>
+          {postToRender.contenido ? (
+            <div className="text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: postToRender.contenido }}></div>
           ) : (
             <div className="text-gray-600 italic">
               Este post no tiene contenido detallado disponible.

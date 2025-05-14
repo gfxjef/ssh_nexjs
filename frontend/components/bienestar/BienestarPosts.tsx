@@ -3,8 +3,8 @@
 import React from 'react';
 import FeaturedPostsSlider from './FeaturedPostsSlider';
 import RecentPostsGrid from './RecentPostsGrid';
-import { PostsProvider } from '../../app/dashboard/bienestar/context/PostsContext';
-import { NotificationsProvider } from '../../app/dashboard/bienestar/context/NotificationsContext';
+// import { PostsProvider } from '../../app/dashboard/bienestar/context/PostsContext'; // Eliminado
+// import { NotificationsProvider } from '../../app/dashboard/bienestar/context/NotificationsContext'; // Eliminado
 // import { clearStorage, initializeStorage } from '../../lib/bienestar/storage'; // Comentado: Ya no se usa directamente aquí
 
 interface BienestarPostsProps {
@@ -36,8 +36,8 @@ export default function BienestarPosts({
   // };
 
   return (
-    <NotificationsProvider>
-      <PostsProvider>
+    // <NotificationsProvider> Eliminado
+    //   <PostsProvider> Eliminado
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8 flex justify-between items-center">
             <div>
@@ -68,7 +68,7 @@ export default function BienestarPosts({
             <RecentPostsGrid maxPosts={maxRecent} />
           </div>
         </div>
-      </PostsProvider>
-    </NotificationsProvider>
+    //   </PostsProvider> Eliminado
+    // </NotificationsProvider> Eliminado
   );
 } 
