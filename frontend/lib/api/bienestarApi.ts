@@ -218,4 +218,52 @@ export const deletePost = async (id: number): Promise<void> => {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
-}; 
+};
+
+// Nueva función para Postularse a un Post
+export async function postularAPost(postId: number, token: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${postId}/postular`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      // No se necesita body si el backend identifica al usuario por el token
+    });
+    // Asumimos que handleResponse está definida en este archivo y maneja errores y parsea JSON
+    // Por ejemplo, podría ser algo como:
+    // if (!response.ok) {
+    //   const errorData = await response.json().catch(() => ({ error: 'Error de red o respuesta no JSON' }));
+    //   throw new Error(errorData.error || `Error HTTP ${response.status}`);
+    // }
+    // return response.json();
+    return handleResponse(response); 
+  } catch (error) {
+    console.error('Error en la función postularAPost:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error de red o desconocido al intentar postular';
+    return { success: false, error: errorMessage };
+  }
+}
+
+// Nueva función para verificar el estado de la postulación
+export async function getEstadoPostulacion(postId: number, token: string): Promise<{ success: boolean; data?: { postulado: boolean }; error?: string }> {
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${postId}/postulacion/status`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response); // Asume que handleResponse maneja errores y parsea JSON
+  } catch (error) {
+    console.error('Error en getEstadoPostulacion:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error de red o desconocido al verificar postulación';
+    return { success: false, error: errorMessage };
+  }
+}
+
+// TODO: Implementar el resto de funciones de API para POSTS
+// - getAllPosts: Considerar parámetros de paginación, orden, etc.
+// ... existing code ... 

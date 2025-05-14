@@ -100,24 +100,42 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
         throw new Error('Categoría no válida');
       }
       
-      const postData = {
+      // TODO: Obtener el usuario_id del contexto de autenticación o sesión
+      // Por ahora, si es modo edición y existe post.autor (que podría ser un ID o nombre)
+      // o el estado local `autor` si es creación. El backend espera `usuario_id` para la query.
+      // Si `autor` del estado es un nombre, y el backend espera un ID, esto necesita unificar.
+      // Asumamos por ahora que `autor` del estado es el nombre del autor que el backend puede usar.
+
+      const postDataPayload = {
         titulo,
         extracto,
         contenido,
-        categoriaId,
-        categoria: selectedCategory.nombre,
-        autor,
-        fecha,
+        categoria_id: categoriaId, // CAMBIADO: de categoriaId a categoria_id
+        // 'categoria' (nombre) no es necesario para el backend en la creación, 
+        // ya que tiene categoria_id. Se podría omitir del payload de creación.
+        autor: autor, // El backend espera `usuario_id` pero la query usa `autor`.
+                      // Esto necesita una definición clara. Por ahora enviamos `autor`.
+        // fecha, // La fecha la debe poner el backend al crear
         estado,
         destacado,
-        imagenUrl,
-        vistas: isEditMode && post ? post.vistas : 0
+        imagen_url: imagenUrl, // CAMBIADO: de imagenUrl a imagen_url (aunque ya era así, es bueno revisar)
+        // vistas: isEditMode && post ? post.vistas : 0 // Vistas no se envían al crear/actualizar normalmente
       };
       
       if (isEditMode && post) {
-        await updatePost(post.id, postData);
+        // Para update, el backend podría esperar una estructura similar
+        // o solo los campos que cambian. La función updatePost en api espera Partial<Omit<Post, ...>>
+        // así que los nombres deben coincidir con el tipo Post.
+        // Si el tipo Post usa `categoriaId` y `imagenUrl`, hay que mapear para el update también si es necesario.
+        // O, mejor, alinear el tipo Post.
+        await updatePost(post.id, {
+            ...postDataPayload, // Usar el payload alineado
+            categoriaId: postDataPayload.categoria_id, // Mapear de vuelta si updatePost espera categoriaId
+            imagenUrl: postDataPayload.imagen_url // Mapear de vuelta si updatePost espera imagenUrl
+            // Quitar campos que el backend no debe recibir en update o que no son del tipo Post
+        } as any); // Usar 'as any' temporalmente o definir un tipo específico para el payload de update
       } else {
-        await addPost(postData);
+        await addPost(postDataPayload as any); // Usar 'as any' o un tipo específico
       }
       
       onClose();

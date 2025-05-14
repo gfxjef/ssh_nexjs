@@ -1,187 +1,204 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePosts } from '../../context/PostsContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import CategoryBadge from '../../../../../components/bienestar/CategoryBadge';
-import Notifications from '../../../../../components/bienestar/Notifications';
+import NotificationsComponent from '../../../../../components/bienestar/Notifications';
 import { Post } from '../../../../../lib/bienestar/types';
+import { 
+  postularAPost, 
+  getPostById as apiGetPostById,
+  getEstadoPostulacion
+} from '../../../../../lib/api/bienestarApi';
 
 export default function PostDetail() {
   const params = useParams();
   const router = useRouter();
+  const { getPostById: getPostFromContext, getCategoryById, loading: contextLoading } = usePosts();
+  const { showNotification } = useNotifications();
   
-  const { getPostById, getCategoryById, loading: contextLoading, posts: allPostsFromContext } = usePosts();
-  
-  const [currentPost, setCurrentPost] = useState<Post | undefined | null>(undefined); // undefined: aún no buscado, null: no encontrado
-  const [pageLoading, setPageLoading] = useState(true);
-  
-  useEffect(() => {
-    console.log("PostDetail EFFECT: Ejecutándose. Params:", params, "ContextLoading:", contextLoading);
-    setPageLoading(true); // Siempre empezamos asumiendo que cargaremos algo o decidiremos.
+  const [post, setPost] = useState<Post | null>(null);
+  const [loadingPost, setLoadingPost] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [yaPostulado, setYaPostulado] = useState(false);
+  const [loadingPostulacionStatus, setLoadingPostulacionStatus] = useState(false);
 
-    if (!params || typeof params.id !== 'string') {
-      // Si params no está listo o id no es string, esperamos.
-      // Si params.id es explícitamente undefined después de que params está disponible, es un problema.
-      if (params && params.id === undefined) {
-        console.error("PostDetail EFFECT: params.id es undefined.");
-        setCurrentPost(null); // Marcar como no encontrado/inválido
-        setPageLoading(false);
+  const id = params?.id;
+  const postIdNumeric = Number(id);
+
+  const fetchPostData = useCallback(async () => {
+    if (isNaN(postIdNumeric)) {
+      showNotification('ID de post no válido.', 'error');
+      setPost(null);
+      setLoadingPost(false);
+      return;
+    }
+    setLoadingPost(true);
+    try {
+      const postFromContext = getPostFromContext(postIdNumeric);
+      let loadedPostData: Post | null = null;
+      if (postFromContext) {
+        console.log(`Post con ID ${postIdNumeric} encontrado en contexto.`);
+        loadedPostData = postFromContext;
+      } else {
+        console.log(`Post con ID ${postIdNumeric} no encontrado en contexto, llamando a API.`);
+        loadedPostData = await apiGetPostById(postIdNumeric, false);
       }
-      // Si !params, el efecto se re-ejecutará cuando params cambie.
+      setPost(loadedPostData);
+    } catch (apiError) {
+      const errorMessage = apiError instanceof Error ? apiError.message : 'Post no encontrado en API o error de carga.';
+      showNotification(errorMessage, 'error');
+      setPost(null);
+    } finally {
+      setLoadingPost(false);
+    }
+  }, [postIdNumeric, getPostFromContext, showNotification]);
+
+  const checkPostulationStatus = useCallback(async () => {
+    if (!post || !post.categoria || post.categoria.toLowerCase() !== 'postulaciones') {
+      setYaPostulado(false);
       return;
     }
 
-    const numericId = Number(params.id);
-
-    if (isNaN(numericId) || numericId <= 0) {
-      console.error("PostDetail EFFECT: ID de post no válido:", params.id);
-      setCurrentPost(null); // Marcar como no encontrado/inválido
-      setPageLoading(false);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      setYaPostulado(false);
       return;
     }
 
-    // En este punto, tenemos un numericId válido.
-    console.log(`PostDetail EFFECT: ID numérico válido: ${numericId}`);
-
-    if (contextLoading) {
-      console.log("PostDetail EFFECT: Contexto aún cargando. Esperando...");
-      // Mantenemos pageLoading en true, el efecto se re-ejecutará cuando contextLoading cambie.
-      return;
+    setLoadingPostulacionStatus(true);
+    try {
+      const response = await getEstadoPostulacion(post.id, token);
+      if (response.success && response.data) {
+        setYaPostulado(response.data.postulado);
+      } else {
+        console.warn("No se pudo verificar el estado de postulación:", response.error);
+        setYaPostulado(false);
+      }
+    } catch (error) {
+      console.error("Error al llamar a getEstadoPostulacion:", error);
+      showNotification('Error al verificar estado de postulación.', 'error');
+      setYaPostulado(false);
+    } finally {
+      setLoadingPostulacionStatus(false);
     }
+  }, [post, showNotification]);
 
-    // El contexto está listo y tenemos un ID numérico válido.
-    console.log(`PostDetail EFFECT: Contexto listo. Buscando post ID: ${numericId}`);
-    const postData = getPostById(numericId);
-    
-    if (postData) {
-      console.log(`PostDetail EFFECT: Post ID ${numericId} ENCONTRADO en contexto.`);
-      setCurrentPost(postData);
-    } else {
-      console.log(`PostDetail EFFECT: Post ID ${numericId} NO ENCONTRADO en contexto.`);
-      setCurrentPost(null); // Marcar como no encontrado
-    }
-    setPageLoading(false);
-
-  }, [params, contextLoading, getPostById, allPostsFromContext]); // allPostsFromContext añadido por si getPostById depende de su referencia estable o contenido directo
-
-  // Redirección si el post no se encontró (currentPost es null) y no estamos cargando
   useEffect(() => {
-    if (!pageLoading && currentPost === null) {
-      console.log("PostDetail REDIRECT EFFECT: currentPost es null y no estamos cargando. Redirigiendo...");
-      router.push('/dashboard/bienestar/posts');
+    if (!contextLoading && postIdNumeric) {
+      fetchPostData();
     }
-  }, [pageLoading, currentPost, router]);
+  }, [postIdNumeric, contextLoading, fetchPostData]);
 
-  // Formatear fecha
-  const formatearFecha = (fechaString: string) => {
-    if (!fechaString) return '';
-    const fecha = new Date(fechaString);
-    return fecha.toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+  useEffect(() => {
+    if (post && !loadingPost) {
+      checkPostulationStatus();
+    }
+  }, [post, loadingPost, checkPostulationStatus]);
+
+  const handlePostularClick = async () => {
+    if (!post) return;
+    if (yaPostulado) {
+        showNotification('Ya te has postulado a esta oferta.', 'info');
+        return;
+    }
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      showNotification('Debes iniciar sesión para postularte.', 'warning');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await postularAPost(post.id, token);
+      if (response.success) {
+        showNotification(response.message || '¡Postulación exitosa!', 'success');
+        setYaPostulado(true);
+      } else {
+        showNotification(response.error || 'Error al postular', 'error');
+      }
+    } catch (error) {
+      showNotification('Ocurrió un error inesperado al intentar postular.', 'error');
+      console.error("Error en handlePostularClick:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  
-  // Si está cargando la página, o no se ha determinado si el post existe
-  if (pageLoading || currentPost === undefined) {
+
+  if (loadingPost) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center items-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954]"></div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  // Si después de cargar, el post es null (no encontrado)
-  // Esta condición podría no alcanzarse si la redirección del useEffect anterior es más rápida.
-  // Pero es una salvaguarda.
-  if (currentPost === null) {
-     // Ya se debería haber redirigido. Si llegamos aquí, es un estado inesperado,
-     // pero mostramos un mensaje de error o un loader antes de la redirección final.
-    console.log("PostDetail RENDER: currentPost es null, pero no se redirigió aún. Mostrando loader.");
+  if (!post) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center items-center h-96">
-        <div className="text-center">
-          <p className="text-xl text-gray-700">Post no encontrado. Serás redirigido...</p>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954] mx-auto mt-4"></div>
-        </div>
+      <div className="container mx-auto px-4 py-8 text-center">
+        <NotificationsComponent />
+        <h1 className="text-2xl font-bold text-red-600 mt-4">Post no encontrado</h1>
+        <p className="text-gray-600 mt-2">El post que buscas no existe o no se pudo cargar.</p>
+        <button 
+          onClick={() => router.push('/dashboard/bienestar/posts')}
+          className="mt-6 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+        >
+          Volver a los posts
+        </button>
       </div>
     );
   }
-  
-  // Si llegamos aquí, tenemos un post válido en currentPost
-  const postToRender = currentPost;
-  const category = getCategoryById(postToRender.categoriaId);
+
+  const category = getCategoryById(post.categoriaId);
+  const postDate = new Date(post.fecha).toLocaleDateString('es-ES', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto">
-        <Notifications />
-        
-        <button 
-          onClick={() => router.back()}
-          className="mb-6 flex items-center text-[#2e3954] hover:underline"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-          </svg>
-          Volver a Posts
-        </button>
-        
-        {postToRender.imagenUrl && (
-          <div className="h-64 md:h-96 bg-gray-200 relative rounded-lg overflow-hidden mb-6">
-            <div 
-              className="absolute inset-0 bg-cover bg-center" 
-              style={{ backgroundImage: `url(${postToRender.imagenUrl})` }}
-            />
-          </div>
+    <div className="bg-gray-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
+        <NotificationsComponent />
+        {post.imagenUrl && (
+          <div className="w-full h-64 md:h-96 bg-cover bg-center" style={{ backgroundImage: `url(${post.imagenUrl})` }}></div>
         )}
-        
-        <div className="mb-8">
-          <div className="flex flex-wrap justify-between items-center mb-4">
-            <div className="flex items-center space-x-3">
-              {category && (
-                <CategoryBadge 
-                  category={category}
-                  className="text-sm"
-                />
-              )}
-              {postToRender.destacado && (
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
-                  <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  Destacado
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-gray-600">
-              {formatearFecha(postToRender.fecha)}
-            </div>
-          </div>
+        <article className="p-6 md:p-10">
+          <header className="mb-8">
+            {category && <CategoryBadge category={category.nombre} color={category.color} />}
+            <h1 className="mt-4 text-3xl md:text-4xl font-bold text-gray-900 leading-tight">{post.titulo}</h1>
+            <p className="mt-3 text-sm text-gray-500">
+              Por <span className="font-medium text-gray-700">{post.autor}</span> el {postDate}
+            </p>
+            {post.vistas > 0 && <p className="text-xs text-gray-500">{post.vistas.toLocaleString()} vistas</p>}
+          </header>
           
-          <h1 className="text-3xl font-bold text-[#2e3954] mb-4">{postToRender.titulo}</h1>
+          {post.extracto && <p className="text-lg text-gray-600 mb-6 italic">{post.extracto}</p>}
           
-          <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-            <div>Por <span className="font-medium">{postToRender.autor}</span></div>
-            <div>{postToRender.vistas.toLocaleString()} lecturas</div>
-          </div>
+          <div 
+            className="prose prose-lg max-w-none text-gray-700"
+            dangerouslySetInnerHTML={{ __html: post.contenido || '' }}
+          />
           
-          <p className="text-lg text-gray-700 italic border-l-4 border-[#2e3954] pl-4 py-2 bg-gray-50 rounded-sm">
-            {postToRender.extracto}
-          </p>
-        </div>
-        
-        <div className="prose prose-lg max-w-none text-gray-800">
-          {postToRender.contenido ? (
-            <div className="text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: postToRender.contenido }}></div>
-          ) : (
-            <div className="text-gray-600 italic">
-              Este post no tiene contenido detallado disponible.
+          {post.categoria && post.categoria.toLowerCase() === 'postulaciones' && (
+            <div className="mt-8 text-center">
+              <button
+                onClick={handlePostularClick}
+                disabled={isSubmitting || yaPostulado || loadingPostulacionStatus}
+                className={`px-6 py-3 font-semibold rounded-lg shadow-md transition-colors duration-150
+                  ${yaPostulado 
+                    ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2'
+                  }
+                  ${isSubmitting || loadingPostulacionStatus ? 'opacity-70 cursor-wait' : ''}
+                `}
+              >
+                {loadingPostulacionStatus ? 'Verificando...' : (isSubmitting ? 'Procesando...' : (yaPostulado ? 'Ya estás postulando' : 'Postularme a esta Oferta'))}
+              </button>
             </div>
           )}
-        </div>
+
+        </article>
       </div>
     </div>
   );
