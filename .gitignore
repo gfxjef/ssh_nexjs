@@ -43,4 +43,7 @@ tasks.json
 tasks/
 
 # Frontend uploads
-frontend/public/uploads/posts/ 
+frontend/public/uploads/posts/
+
+# Backend specific files
+backend/db/pdf_manager/pdf_files/ 
