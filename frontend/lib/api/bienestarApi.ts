@@ -181,15 +181,24 @@ export const updatePost = async (id: number, postData: Partial<Omit<Post, 'id' |
  * @param status Nuevo estado del post
  */
 export const changePostStatus = async (id: number, status: PostStatus): Promise<Post> => {
-  const response = await fetch(`${BASE_URL}/posts/${id}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ status }),
-  });
-  const result = await handleResponse<{ success: boolean, message: string, data: Post }>(response);
-  return result.data;
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) {
+      // Intenta obtener el mensaje de error del backend si está disponible
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `Error al cambiar estado del post ${id}`);
+    }
+    return await handleResponse<Post>(response);
+  } catch (error) {
+    console.error('Error en changePostStatus:', error);
+    throw error;
+  }
 };
 
 /**
@@ -198,15 +207,24 @@ export const changePostStatus = async (id: number, status: PostStatus): Promise<
  * @param destacado Booleano para el estado destacado
  */
 export const togglePostHighlight = async (id: number, destacado: boolean): Promise<Post> => {
-  const response = await fetch(`${BASE_URL}/posts/${id}/highlight`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ destacado }),
-  });
-  const result = await handleResponse<{ success: boolean, message: string, data: Post }>(response);
-  return result.data;
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${id}/highlight`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ destacado }),
+    });
+    if (!response.ok) {
+      // Intenta obtener el mensaje de error del backend si está disponible
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `Error al cambiar destacado del post ${id}`);
+    }
+    return await handleResponse<Post>(response);
+  } catch (error) {
+    console.error('Error en togglePostHighlight:', error);
+    throw error;
+  }
 };
 
 /**
@@ -214,10 +232,19 @@ export const togglePostHighlight = async (id: number, destacado: boolean): Promi
  * @param id ID del post a eliminar
  */
 export const deletePost = async (id: number): Promise<void> => {
-  const response = await fetch(`${BASE_URL}/posts/${id}`, {
-    method: 'DELETE',
-  });
-  await handleResponse<void>(response);
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `Error al eliminar post ${id}`);
+    }
+    // No se espera contenido en una respuesta DELETE exitosa, así que no llamamos a handleResponse
+  } catch (error) {
+    console.error('Error en deletePost:', error);
+    throw error;
+  }
 };
 
 // Nueva función para Postularse a un Post
@@ -229,20 +256,12 @@ export async function postularAPost(postId: number, token: string): Promise<{ su
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      // No se necesita body si el backend identifica al usuario por el token
     });
-    // Asumimos que handleResponse está definida en este archivo y maneja errores y parsea JSON
-    // Por ejemplo, podría ser algo como:
-    // if (!response.ok) {
-    //   const errorData = await response.json().catch(() => ({ error: 'Error de red o respuesta no JSON' }));
-    //   throw new Error(errorData.error || `Error HTTP ${response.status}`);
-    // }
-    // return response.json();
-    return handleResponse(response); 
+    return await response.json(); // Asume que el backend siempre devuelve JSON
   } catch (error) {
-    console.error('Error en la función postularAPost:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Error de red o desconocido al intentar postular';
-    return { success: false, error: errorMessage };
+    console.error('Error en postularAPost:', error);
+    // Devuelve una estructura de error consistente
+    return { success: false, error: error instanceof Error ? error.message : 'Error de red o desconocido' };
   }
 }
 
@@ -252,15 +271,50 @@ export async function getEstadoPostulacion(postId: number, token: string): Promi
     const response = await fetch(`${BASE_URL}/posts/${postId}/postulacion/status`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
     });
-    return handleResponse(response); // Asume que handleResponse maneja errores y parsea JSON
+    return await response.json();
   } catch (error) {
     console.error('Error en getEstadoPostulacion:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Error de red o desconocido al verificar postulación';
-    return { success: false, error: errorMessage };
+    return { success: false, error: error instanceof Error ? error.message : 'Error de red o desconocido' };
+  }
+}
+
+// Interfaz para la respuesta de postulantes
+export interface Postulante {
+  usuarioId: number;
+  nombre: string;
+  correo: string;
+  fechaPostulacion: string; // ISO Date string
+}
+
+export async function getPostulantesByPostId(postId: number, token?: string): Promise<Postulante[]> {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${BASE_URL}/posts/${postId}/postulantes`, {
+      method: 'GET',
+      headers: headers,
+    });
+
+    // No usar handleResponse aquí directamente si la estructura de éxito es diferente
+    // (es decir, si no siempre tiene un campo 'data' anidado como las otras)
+    // Asumimos que este endpoint devuelve { success: true, data: Postulante[] } o { success: false, error: string }
+    const responseData = await response.json();
+
+    if (!response.ok || !responseData.success) {
+      throw new Error(responseData.error || `Error al obtener postulantes para el post ${postId}`);
+    }
+    return responseData.data as Postulante[]; // Aseguramos el tipado aquí
+  } catch (error) {
+    console.error('Error en getPostulantesByPostId:', error);
+    throw error; // Re-lanzar para que el llamador lo maneje
   }
 }
 
