@@ -2,62 +2,64 @@
 
 import { useState, useEffect } from 'react';
 
-// Datos de ejemplo para los catálogos
-const catalogosEjemplo = [
-  {
-    name: 'Catalogo_Binder_2023.pdf',
-    thumbnailAvailable: true
-  },
-  {
-    name: 'Manual_Esco_Filtros.pdf',
-    thumbnailAvailable: true
-  },
-  {
-    name: 'Productos_Atago_2023.pdf',
-    thumbnailAvailable: true
-  },
-  {
-    name: 'Catalogo_General_2024.pdf',
-    thumbnailAvailable: false
-  },
-  {
-    name: 'Instrumentos_Laboratorio.pdf',
-    thumbnailAvailable: true
-  }
-];
+// Define la URL base de tu backend Flask
+const BACKEND_BASE_URL = 'http://localhost:5000'; 
+
+// Interfaz para el objeto catálogo como lo devuelve la API del backend
+interface CatalogoFromAPI {
+  name: string; // Nombre del catálogo (directorio y base del nombre del PDF)
+  pages: number;
+  has_images: boolean;
+  original_pdf_available: boolean;
+  original_pdf_path_relative: string | null; // ej: "CATALOGO_X/CATALOGO_X.pdf"
+  thumbnail_path_relative: string | null;    // ej: "CATALOGO_X/thumb_CATALOGO_X.webp"
+  images_base_path_relative: string; // ej: "CATALOGO_X"
+}
 
 export default function Catalogos() {
   // Estados
-  const [catalogos, setCatalogos] = useState<any[]>([]);
-  const [catalogosFiltrados, setCatalogosFiltrados] = useState<any[]>([]);
+  const [catalogos, setCatalogos] = useState<CatalogoFromAPI[]>([]);
+  const [catalogosFiltrados, setCatalogosFiltrados] = useState<CatalogoFromAPI[]>([]);
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [modalReporteVisible, setModalReporteVisible] = useState(false);
-  const [pdfSeleccionado, setPdfSeleccionado] = useState('');
+  const [pdfSeleccionado, setPdfSeleccionado] = useState<CatalogoFromAPI | null>(null); // Guardará el objeto completo
   const [tipoError, setTipoError] = useState('');
   const [descripcionError, setDescripcionError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   
   // Cargar catálogos al montar el componente
   useEffect(() => {
     cargarCatalogos();
   }, []);
   
-  // Filtrar catálogos cuando cambia el término de búsqueda
+  // Filtrar catálogos cuando cambia el término de búsqueda o la lista original
   useEffect(() => {
     if (catalogos.length > 0) {
       filtrarCatalogos();
     }
   }, [terminoBusqueda, catalogos]);
   
-  // Función para cargar catálogos desde la API
+  // Función para cargar catálogos desde la API del backend
   const cargarCatalogos = async () => {
+    setIsLoading(true);
+    setErrorCarga(null);
     try {
-      // En una aplicación real, esto sería una llamada fetch a la API
-      // Por ahora usamos datos de ejemplo
-      setCatalogos(catalogosEjemplo);
-      setCatalogosFiltrados(catalogosEjemplo);
+      const response = await fetch(`${BACKEND_BASE_URL}/api/pdfs/listar-pdfs-procesados`);
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+      }
+      const data: CatalogoFromAPI[] = await response.json();
+      console.log("Catálogos cargados desde el backend:", data);
+      setCatalogos(data);
+      setCatalogosFiltrados(data); // Inicialmente mostrar todos
     } catch (error) {
-      console.error('Error al cargar catálogos:', error);
+      console.error('Error al cargar catálogos desde el backend:', error);
+      setErrorCarga(error instanceof Error ? error.message : 'Error desconocido al cargar catálogos.');
+      setCatalogos([]); // Limpiar en caso de error
+      setCatalogosFiltrados([]);
     }
+    setIsLoading(false);
   };
   
   // Función para filtrar catálogos por término de búsqueda
@@ -76,97 +78,176 @@ export default function Catalogos() {
   };
   
   // Función para abrir el modal de reporte
-  const abrirModalReporte = (nombrePdf: string) => {
-    setPdfSeleccionado(nombrePdf);
+  const abrirModalReporte = (catalogo: CatalogoFromAPI) => {
+    setPdfSeleccionado(catalogo);
     setTipoError('');
     setDescripcionError('');
     setModalReporteVisible(true);
   };
   
   // Función para enviar reporte de error
-  const enviarReporte = (e: React.FormEvent) => {
+  const enviarReporte = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!tipoError || !descripcionError) {
-      alert('Por favor completa todos los campos del formulario.');
+    if (!tipoError || !descripcionError || !pdfSeleccionado) {
+      alert('Por favor completa todos los campos del formulario y asegúrate de que un PDF esté seleccionado.');
       return;
     }
     
-    // En una aplicación real, aquí enviaríamos el reporte a la API
-    console.log('Enviando reporte para:', pdfSeleccionado);
-    console.log('Tipo de error:', tipoError);
-    console.log('Descripción:', descripcionError);
+    const reportData = {
+        pdf: pdfSeleccionado.name, // Nombre del catálogo
+        tipo: tipoError,
+        descripcion: descripcionError,
+        // podrías añadir datos del usuario si los tienes en el frontend
+        // usuario: "Usuario Frontend", 
+        // cargo: "-"
+    };
+
+    console.log('Enviando reporte para:', pdfSeleccionado.name, reportData);
     
-    // Mostrar mensaje de éxito y cerrar modal
-    alert(`Reporte enviado correctamente para el catálogo "${formatearNombreCatalogo(pdfSeleccionado)}"`);
-    cerrarModalReporte();
+    try {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/pdfs/report-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(reportData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({error: `Error HTTP ${response.status}`}));
+            throw new Error(errorData.error || `Error HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+            alert(`Reporte enviado correctamente para el catálogo "${formatearNombreCatalogo(pdfSeleccionado.name)}"`);
+            cerrarModalReporte();
+        } else {
+            throw new Error(result.error || 'Error desconocido al enviar el reporte.');
+        }
+    } catch (error) {
+        console.error('Error al enviar reporte:', error);
+        alert(`Error al enviar el reporte: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
   
-  // Función para compartir un catálogo
-  const compartirCatalogo = (nombreCatalogo: string) => {
-    // En una aplicación real, esto generaría un enlace compartible
-    const urlCompartir = `http://ejemplo.com/catalogo?pdf=${encodeURIComponent(nombreCatalogo)}`;
+  // Función para compartir un catálogo (actualizada para el visualizador del backend)
+  const compartirCatalogo = (catalogo: CatalogoFromAPI) => {
+    const urlCompartir = `${BACKEND_BASE_URL}/api/pdfs/?pdf=${encodeURIComponent(catalogo.name)}`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(urlCompartir)
         .then(() => {
-          // Mostrar mensaje de éxito
-          alert('Enlace copiado al portapapeles');
+          alert('Enlace para ver el PDF copiado al portapapeles!');
         })
         .catch(err => {
           console.error('Error al copiar enlace:', err);
           alert('No se pudo copiar el enlace automáticamente. URL: ' + urlCompartir);
         });
     } else {
-      // Fallback para navegadores sin soporte de clipboard
       alert('No se pudo copiar el enlace automáticamente. URL: ' + urlCompartir);
+    }
+  };
+
+  // Función para ver el PDF en el visualizador del backend
+  const verPdf = (catalogo: CatalogoFromAPI) => {
+    const viewerUrl = `${BACKEND_BASE_URL}/api/pdfs/?pdf=${encodeURIComponent(catalogo.name)}`;
+    window.open(viewerUrl, '_blank'); // Abre en una nueva pestaña
+  };
+
+  // Función para descargar el PDF original
+  const descargarPdf = async (catalogo: CatalogoFromAPI) => {
+    if (!catalogo.original_pdf_path_relative) {
+        alert("El archivo PDF original no está disponible para este catálogo.");
+        return;
+    }
+    // La ruta es NombreCatalogo/NombreCatalogo.pdf
+    const downloadUrl = `${BACKEND_BASE_URL}/api/pdfs/processed_files/${catalogo.original_pdf_path_relative}`;
+    console.log("Intentando descargar desde:", downloadUrl);
+
+    try {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+            throw new Error(`Error HTTP ${response.status} al descargar el archivo.`);
+        }
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = catalogo.name + '.pdf'; // Nombre del archivo para descarga
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+        console.error("Error al descargar PDF:", error);
+        alert("No se pudo descargar el PDF. " + (error instanceof Error ? error.message : String(error)));
     }
   };
   
   // Función para eliminar un catálogo
-  const eliminarCatalogo = (nombreCatalogo: string) => {
-    if (confirm(`¿Estás seguro que deseas eliminar el catálogo "${formatearNombreCatalogo(nombreCatalogo)}"?`)) {
-      // En una aplicación real, aquí eliminaríamos el catálogo a través de la API
-      const nuevoscatalogos = catalogos.filter(catalogo => catalogo.name !== nombreCatalogo);
-      setCatalogos(nuevoscatalogos);
-      
-      // Mostrar mensaje de éxito
-      alert(`Catálogo "${formatearNombreCatalogo(nombreCatalogo)}" eliminado correctamente.`);
+  const eliminarCatalogo = async (catalogo: CatalogoFromAPI) => {
+    if (confirm(`¿Estás seguro que deseas eliminar el catálogo "${formatearNombreCatalogo(catalogo.name)}"?`)) {
+      try {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/pdfs/delete-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ pdf_name: catalogo.name })
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({error: `Error HTTP ${response.status}`}));
+            throw new Error(errorData.error || `Error HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.success) {
+            alert(`Catálogo "${formatearNombreCatalogo(catalogo.name)}" eliminado correctamente.`);
+            cargarCatalogos(); // Recargar la lista después de eliminar
+        } else {
+            throw new Error(result.error || 'Error al eliminar el catálogo desde el backend.');
+        }
+      } catch (error) {
+        console.error('Error al eliminar catálogo:', error);
+        alert("Error al eliminar el catálogo: "+ (error instanceof Error ? error.message : String(error)));
+      }
     }
   };
   
-  // Función para actualizar un catálogo
-  const actualizarCatalogo = (nombreCatalogo: string) => {
-    // En una aplicación real, aquí abriríamos un modal para subir un nuevo archivo
-    alert(`Función para actualizar el catálogo "${formatearNombreCatalogo(nombreCatalogo)}" (por implementar)`);
+  // Función para actualizar un catálogo (redirige a la página de subida del backend)
+  const actualizarCatalogo = (catalogo: CatalogoFromAPI) => {
+    // alert(`Actualizar catálogo: ${catalogo.name}. Esto podría implicar borrar el antiguo y subir uno nuevo.`);
+    // Podríamos simplemente redirigir a la página de subida del backend
+    const uploadPageUrl = `${BACKEND_BASE_URL}/api/pdfs/upload-page`;
+    window.open(uploadPageUrl, '_blank'); 
+    alert("Se abrirá la página de subida en una nueva pestaña. Sube el nuevo PDF con el MISMO NOMBRE para reemplazar el existente: " + catalogo.name);
   };
   
-  // Función para compartir el visualizador general
+  // Función para compartir el visualizador general (ahora es la página de catálogo del backend)
   const compartirVisualizadorGeneral = () => {
-    // En una aplicación real, esto sería la URL del visualizador general
-    const urlVisualizador = "http://ejemplo.com/visualizador-general";
+    const urlVisualizador = `${BACKEND_BASE_URL}/api/pdfs/catalogo`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(urlVisualizador)
         .then(() => {
-          // Mostrar mensaje de éxito
-          alert('Enlace del visualizador general copiado al portapapeles');
+          alert('Enlace de la página de catálogos copiado al portapapeles');
         })
         .catch(err => {
           console.error('Error al copiar enlace:', err);
           alert('No se pudo copiar el enlace automáticamente. URL: ' + urlVisualizador);
         });
     } else {
-      // Fallback para navegadores sin soporte de clipboard
       alert('No se pudo copiar el enlace automáticamente. URL: ' + urlVisualizador);
     }
   };
   
   // Función para formatear el nombre del catálogo para mostrar
   const formatearNombreCatalogo = (nombre: string) => {
+    if (!nombre) return 'Nombre no disponible';
     return nombre
       .replace(/_/g, ' ')
-      .replace(/.pdf$/i, '')
+      .replace(/.pdf$/i, '') // Quita .pdf si está al final (aunque el 'name' de la API ya no lo tiene)
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
@@ -175,29 +256,57 @@ export default function Catalogos() {
   // Función para cerrar el modal de reporte
   const cerrarModalReporte = () => {
     setModalReporteVisible(false);
-    setPdfSeleccionado('');
+    setPdfSeleccionado(null);
     setTipoError('');
     setDescripcionError('');
   };
+
+  const irAPaginaDeSubida = () => {
+    const uploadUrl = `${BACKEND_BASE_URL}/api/pdfs/upload-page`;
+    window.open(uploadUrl, '_blank');
+  };
+
+  if (isLoading) {
+    return <div className="container mx-auto px-4 py-8 text-center">Cargando catálogos...</div>;
+  }
+
+  if (errorCarga) {
+    return <div className="container mx-auto px-4 py-8 text-center text-red-500">Error al cargar: {errorCarga}</div>;
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white p-6 rounded-lg shadow-md">
         {/* Cabecera con título y buscador */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-[#2e3954] mb-4 md:mb-0">Nuestros Catálogos</h1>
-          <div className="relative w-full md:w-80">
-            <input 
-              type="text"
-              value={terminoBusqueda}
-              onChange={(e) => setTerminoBusqueda(e.target.value)}
-              placeholder="Buscar catálogos..."
-              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#d48b45] focus:border-transparent text-gray-800 bg-white"
-            />
-            <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-[#d48b45]">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <h1 className="text-2xl font-bold text-[#2e3954] mb-4 md:mb-0">Nuestros Catálogos (Backend)</h1>
+          
+          {/* Contenedor para el buscador y el botón de añadir */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-80">
+              <input 
+                type="text"
+                value={terminoBusqueda}
+                onChange={(e) => setTerminoBusqueda(e.target.value)}
+                placeholder="Buscar catálogos..."
+                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#d48b45] focus:border-transparent text-gray-800 bg-white"
+              />
+              <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-[#d48b45]" aria-label="Buscar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
+            </div>
+            <button 
+              onClick={irAPaginaDeSubida}
+              title="Añadir nuevo catálogo"
+              className="p-2 bg-[#2e3954] text-white rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center aspect-square"
+              style={{ width: '40px', height: '40px' }} // Asegura que sea un círculo si es redondo
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
             </button>
           </div>
@@ -209,7 +318,7 @@ export default function Catalogos() {
             onClick={compartirVisualizadorGeneral}
             className="flex items-center justify-between w-full px-6 py-3 bg-[#2e3954] text-white rounded-md hover:bg-opacity-90 transition-colors duration-200"
           >
-            <span className="font-medium">Visualizador General de catálogos</span>
+            <span className="font-medium">Página de Catálogos (Backend)</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -220,20 +329,19 @@ export default function Catalogos() {
         {/* Lista de catálogos */}
         <div className="space-y-6">
           {catalogosFiltrados.length > 0 ? (
-            catalogosFiltrados.map((catalogo, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-[auto_1fr_auto] gap-4 items-center">
+            catalogosFiltrados.map((catalogo) => (
+              <div key={catalogo.name} className="border border-gray-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-[auto_1fr_auto] gap-4 items-center">
                 {/* Miniatura del catálogo */}
                 <div className="w-[120px] h-[170px] border border-gray-300 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center mx-auto md:mx-0">
-                  {catalogo.thumbnailAvailable ? (
+                  {catalogo.thumbnail_path_relative ? (
                     <img
-                      src={`/images/thumb_${catalogo.name.replace('.pdf', '')}.jpg`}
+                      src={`${BACKEND_BASE_URL}/api/pdfs/processed_files/${catalogo.thumbnail_path_relative}`}
                       alt={formatearNombreCatalogo(catalogo.name)}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        // Fallback si la imagen no se encuentra
                         const target = e.target as HTMLImageElement;
                         target.onerror = null;
-                        target.src = '/images/pdf-icon.svg';
+                        target.src = '/images/pdf-icon.svg'; // Fallback local del frontend
                       }}
                     />
                   ) : (
@@ -252,7 +360,11 @@ export default function Catalogos() {
                 <div className="flex flex-col gap-3 w-full md:w-auto">
                   {/* Primera fila de botones */}
                   <div className="grid grid-cols-3 gap-2">
-                    <button className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors">
+                    <button 
+                      onClick={() => descargarPdf(catalogo)}
+                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      title="Descargar PDF Original"
+                    >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -261,7 +373,11 @@ export default function Catalogos() {
                       <span className="text-xs md:text-sm hidden md:inline text-gray-800">Descargar</span>
                     </button>
                     
-                    <button className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors">
+                    <button 
+                      onClick={() => verPdf(catalogo)}
+                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      title="Ver PDF en el visualizador"
+                    >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                         <circle cx="12" cy="12" r="3"></circle>
@@ -270,8 +386,9 @@ export default function Catalogos() {
                     </button>
                     
                     <button 
-                      onClick={() => compartirCatalogo(catalogo.name)}
+                      onClick={() => compartirCatalogo(catalogo)}
                       className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      title="Copiar enlace para ver PDF"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -284,8 +401,9 @@ export default function Catalogos() {
                   {/* Segunda fila de botones */}
                   <div className="grid grid-cols-3 gap-2">
                     <button 
-                      onClick={() => eliminarCatalogo(catalogo.name)}
+                      onClick={() => eliminarCatalogo(catalogo)}
                       className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-red-500 transition-colors"
+                      title="Eliminar Catálogo del Servidor"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -295,8 +413,9 @@ export default function Catalogos() {
                     </button>
                     
                     <button 
-                      onClick={() => actualizarCatalogo(catalogo.name)}
+                      onClick={() => actualizarCatalogo(catalogo)} // Pasa el objeto catálogo completo
                       className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      title="Actualizar Catálogo (subir nueva versión)"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
@@ -305,8 +424,9 @@ export default function Catalogos() {
                     </button>
                     
                     <button 
-                      onClick={() => abrirModalReporte(catalogo.name)}
+                      onClick={() => abrirModalReporte(catalogo)} // Pasa el objeto catálogo completo
                       className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      title="Reportar Problema con este PDF"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -321,19 +441,19 @@ export default function Catalogos() {
             ))
           ) : (
             <div className="text-center py-8 text-gray-500">
-              No se encontraron catálogos que coincidan con la búsqueda.
+              {!isLoading && catalogos.length === 0 ? 'No hay catálogos disponibles en el servidor.' : 'No se encontraron catálogos que coincidan con la búsqueda.'}
             </div>
           )}
         </div>
         
         {/* Modal de reporte */}
-        {modalReporteVisible && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        {modalReporteVisible && pdfSeleccionado && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-md max-h-[90vh] overflow-auto">
               {/* Cabecera del modal */}
               <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center rounded-t-lg">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Reportar problema con PDF: <span className="font-semibold">{formatearNombreCatalogo(pdfSeleccionado)}</span>
+                  Reportar problema: <span className="font-semibold">{formatearNombreCatalogo(pdfSeleccionado.name)}</span>
                 </h3>
                 <button 
                   onClick={cerrarModalReporte}
@@ -382,17 +502,19 @@ export default function Catalogos() {
                 </form>
               </div>
               
-              {/* Pie del modal */}
-              <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-2 rounded-b-lg">
+              {/* Pie del modal */}              
+              <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3 rounded-b-lg">
                 <button
+                  type="button" // Asegurar que no haga submit del form por defecto
                   onClick={cerrarModalReporte}
-                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm font-medium"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={enviarReporte}
-                  className="px-4 py-2 bg-[#2e3954] text-white rounded hover:bg-[#8dbba3] transition-colors"
+                  type="submit" // Este es el que realmente envía el formulario
+                  onClick={enviarReporte} // Asociado al submit del form o directamente al click
+                  className="px-4 py-2 bg-[#2e3954] text-white rounded-md hover:bg-opacity-90 transition-colors text-sm font-medium"
                 >
                   Enviar Reporte
                 </button>

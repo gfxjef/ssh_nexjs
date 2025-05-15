@@ -13,6 +13,9 @@ from db.bienestar import bienestar_bp, init_bienestar_db
 # Importar el blueprint de encuestas
 from db.encuestas import encuestas_bp, init_encuestas_db
 
+# Importar el blueprint del gestor de PDFs
+from db.pdf_manager import pdf_manager_bp, init_pdf_module
+
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -41,6 +44,9 @@ app.register_blueprint(bienestar_bp, url_prefix='/api/bienestar')
 # Registrar el blueprint de encuestas con el prefijo correcto
 app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
 
+# Registrar el blueprint del gestor de PDFs
+app.register_blueprint(pdf_manager_bp) # El prefijo ya está en el blueprint
+
 # Inicializar la base de datos del módulo de bienestar
 with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la aplicación
     print("APP: Llamando a init_bienestar_db()")
@@ -51,6 +57,11 @@ with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la apli
     print("APP: Llamando a init_encuestas_db()")
     init_encuestas_db()
     print("APP: init_encuestas_db() finalizado.")
+
+    # Inicializar el módulo PDF (crear directorios y el procesador)
+    print("APP: Llamando a init_pdf_module()")
+    init_pdf_module(app) # Pasar la instancia de la app
+    print("APP: init_pdf_module() finalizado.")
 
 # Authentication routes
 @app.route('/api/auth/login', methods=['POST'])

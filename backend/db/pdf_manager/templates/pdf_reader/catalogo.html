@@ -1,0 +1,452 @@
+<!-- Estilos específicos para la página de catálogo -->
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --accent-color: #3498db;
+        --bg-color: #f8f9fa;
+        --card-color: #ffffff;
+        --text-color: #333333;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+        --hover-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+        --transition: all 0.3s ease;
+    }
+
+    .catalog-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    header {
+        text-align: center;
+        margin-bottom: 3rem;
+        padding-top: 2rem;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        font-weight: 500;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.5px;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 2rem;
+    }
+
+    .card {
+        background-color: var(--card-color);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease-out;
+        position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+        transform: translateY(0);
+        opacity: 0;
+    }
+
+    .card.loaded {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .card-thumbnail {
+        position: relative;
+        padding-top: 140%; /* Aspect ratio 1:1.4 (similar a un documento) */
+        background-color: #f5f5f5;
+        overflow: hidden;
+    }
+
+    .card-thumbnail img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scale(1);
+        opacity: 0;
+        transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+        will-change: transform;
+    }
+
+    .card-thumbnail img.loaded {
+        opacity: 1;
+    }
+
+    .card:hover .card-thumbnail img {
+        transform: scale(1.05);
+    }
+
+    .pdf-icon {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        opacity: 0.9;
+    }
+
+    .no-docs {
+        text-align: center;
+        padding: 3rem;
+        font-size: 1.2rem;
+        color: #666;
+        grid-column: 1 / -1;
+    }
+
+    /* Loader */
+    .loader {
+        width: 48px;
+        height: 48px;
+        border: 5px solid #FFF;
+        border-bottom-color: var(--accent-color);
+        border-radius: 50%;
+        display: inline-block;
+        box-sizing: border-box;
+        animation: rotation 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    @keyframes rotation {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .container {
+            padding: 1rem;
+        }
+        
+        .grid {
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 1rem;
+        }
+    }
+</style>
+
+<div class="catalog-container">
+    <header>
+        <h1>Catálogos Kossodo 2025</h1>
+    </header>
+
+    <div id="catalog-grid" class="grid">
+        <!-- Los catálogos se cargarán aquí -->
+        <div class="no-docs">
+            <span class="loader"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+// Asegurarse de que este script se ejecute primero o que las variables estén disponibles globalmente
+// si se definen en un script separado que se carga antes.
+
+// Definición de AppConfig y Router
+var AppConfig = {
+  BASE_URL: '{{ pdf_manager_base_url | default("/api/pdfs") | safe }}',
+  STATIC_BASE_URL: '{{ pdf_manager_static_url | default("/api/pdfs/static") | safe }}',
+  
+  _cleanBase: function(url) {
+    return url.replace(/\/+$/, ''); // Elimina solo slashes al final
+  },
+
+  getFullPath: function(relativePath) {
+    const cleanedBaseUrl = this._cleanBase(this.BASE_URL);
+    let path = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    
+    if (relativePath.startsWith('?')) { // Es un query string
+        return cleanedBaseUrl + path; // ej: /api/pdfs?param=val
+    }
+    return cleanedBaseUrl + '/' + path; // ej: /api/pdfs/ruta
+  },
+
+  getStaticPath: function(staticRelativePath) {
+    const cleanedStaticUrl = this._cleanBase(this.STATIC_BASE_URL);
+    let path = staticRelativePath.startsWith('/') ? staticRelativePath.substring(1) : staticRelativePath;
+    return cleanedStaticUrl + '/' + path; // ej: /api/pdfs/static/js/archivo.js
+  }
+};
+
+var Router = {
+  loadContent: function(pathWithQuery) {
+    // pathWithQuery es la parte de la ruta *después* del prefijo del blueprint
+    // ej. 'catalogo', '?pdf=Nombre.pdf' (para index_route), 'upload-page'
+    window.location.href = AppConfig.getFullPath(pathWithQuery);
+  }
+};
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // Modificada: función para obtener la lista de PDFs procesados con sus miniaturas
+    async function getPDFList() {
+        try {
+            console.log("⏳ Intentando obtener lista de PDFs...");
+            
+            // La ruta de la API es 'listar-pdfs-procesados' dentro del blueprint
+            const response = await fetch(AppConfig.getFullPath('listar-pdfs-procesados'));
+            const processedPdfs = await response.json();
+            console.log("PDFs procesados recibidos:", processedPdfs);
+            
+            if (processedPdfs && processedPdfs.length > 0) {
+                return processedPdfs;
+            } else {
+                console.warn("No se encontraron PDFs procesados.");
+                // Considerar la lógica de fallbackPDFList si es necesario aquí
+                return fallbackPDFList().map(name => ({ 
+                    name: name, 
+                    isFallback: true, // Marcar como fallback para manejo especial
+                    thumbnail_path_relative: null // Fallback no tiene thumb del backend
+                }));
+            }
+        } catch (error) {
+            console.error('Error al cargar PDFs:', error);
+            return fallbackPDFList().map(name => ({ 
+                name: name, 
+                isFallback: true,
+                thumbnail_path_relative: null
+            }));
+        }
+    }
+
+    // Lista de respaldo en caso de que falle la obtención automática
+    function fallbackPDFList() {
+        return [
+            "Catálogo de Alimentos y bebidas - Kossodo 2025.pdf",
+            "Catálogo de Industria Farmaceutica - Kossodo 2025.pdf",
+            "Catálogo de indutria  Farmaeuticas- Kossodo 2025.pdf",
+            "Catálogo de Mineria - Kossodo 2025.pdf",
+            "Catálogo de Pesca - Kossodo 2025.pdf"
+        ];
+    }
+
+    // Modificada: función para generar el HTML de las tarjetas
+    async function renderCatalogCards(pdfs) {
+        const catalogGrid = document.getElementById('catalog-grid');
+        
+        if (!pdfs || pdfs.length === 0) {
+            catalogGrid.innerHTML = `
+                <div class="no-docs">
+                    No se encontraron documentos. Intente nuevamente más tarde o suba nuevos catálogos.
+                </div>
+            `;
+            return;
+        }
+        
+        catalogGrid.innerHTML = ''; // Limpiar el grid
+        
+        pdfs.forEach((pdfData, index) => {
+            // pdfData.name es el nombre base del PDF (nombre de la carpeta) para procesados,
+            // o el nombre completo del archivo para fallbacks.
+            const pdfDisplayName = pdfData.name.replace(/\\.pdf$/, ''); // Quitar .pdf si es un fallback
+            
+            // Para PDFs procesados, pdfData.name es el nombre de la carpeta.
+            // Para fallbacks, pdfData.name es el nombre del archivo completo.
+            // La URL para ver el PDF (index.html del blueprint) requiere el nombre del PDF como query param.
+            // Si es procesado, usamos pdfData.name (nombre base). Si es fallback, usamos pdfData.name (nombre completo)
+            const pdfQueryParam = pdfData.isFallback ? pdfData.name : pdfData.name;
+            const pdfViewUrl = AppConfig.getFullPath('?pdf=' + encodeURIComponent(pdfQueryParam));
+            
+            let thumbnailUrl = null;
+
+            if (pdfData.thumbnail_path_relative) { // Campo del backend para PDFs procesados
+                // thumbnail_path_relative será "NombreDelPDF/thumb_NombreDelPDF.webp"
+                thumbnailUrl = AppConfig.getFullPath('processed_files/' + pdfData.thumbnail_path_relative);
+                console.log(`Usando miniatura del backend: ${thumbnailUrl} para ${pdfData.name}`);
+            } else if (pdfData.isFallback) {
+                // Lógica de fallback para encontrar miniaturas (si aún se desea)
+                // Esta lógica intentaba rutas como /pdf_reader/pdf/... que ya no aplican directamente.
+                // Se podría intentar generar una si se sabe dónde está el PDF de fallback.
+                // Por ahora, los fallbacks no tendrán miniatura a menos que generateAndSetThumbnail funcione.
+                console.log(`PDF de fallback: "${pdfData.name}", sin miniatura predefinida.`);
+            } else {
+                 console.log(`PDF procesado: "${pdfData.name}" no tiene thumbnail_path_relative.`);
+            }
+            
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.id = `pdf-card-${index}`;
+            card.setAttribute('data-pdf-url', pdfViewUrl);
+            card.addEventListener('click', function() {
+                window.location.href = this.getAttribute('data-pdf-url');
+            });
+            
+            let cardContent = '';
+            if (thumbnailUrl) {
+                cardContent = `
+                    <div class="card-thumbnail">
+                        <img src="${thumbnailUrl}" alt="${pdfDisplayName}" class="loaded" 
+                             onerror="this.style.display='none'; this.parentElement.innerHTML += '<p>Error al cargar miniatura.</p>'; console.error('❌ Error al cargar miniatura: ${thumbnailUrl}')">
+                    </div>
+                `;
+            } else {
+                cardContent = `
+                    <div class="card-thumbnail">
+                        <div class="card-loading" style="display:none;"> <!-- Ocultar por defecto si no hay thumb inmediato -->
+                            <span class="loader"></span>
+                        </div>
+                        <svg class="pdf-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path fill="#e74c3c" d="M12,2H6V22H18V8L12,2Z M12,4L16,8H12V4Z M9,10H15V12H9V10Z M9,14H15V16H9V14Z M9,18H13V20H9V18Z"/>
+                        </svg>
+                        <p style="text-align:center; padding: 5px; font-size:0.8em;">${pdfDisplayName}</p>
+                    </div>
+                `;
+            }
+            card.innerHTML = cardContent;
+            catalogGrid.appendChild(card);
+            
+            setTimeout(() => {
+                card.classList.add('loaded');
+            }, 50 * index);
+            
+            // Solo intentar generar para fallbacks o si explícitamente no hay thumbnail
+            if (!thumbnailUrl && pdfData.isFallback) {
+                 // El PDF de fallback debe estar en una ruta accesible para que generatePDFThumbnail funcione.
+                 // Asumiendo que los PDFs de fallback están en la carpeta 'pdf_files' bajo su nombre completo.
+                 // Ejemplo: 'pdf_files/Catálogo de Alimentos y bebidas - Kossodo 2025.pdf/Catálogo de Alimentos y bebidas - Kossodo 2025.pdf'
+                 // Esto requiere que process_pdf también guarde los PDFs originales de esa manera si queremos generarles thumb dinámico
+                 // O, que los PDFs de fallback se encuentren en una ruta estática conocida.
+                 // Por ahora, la ruta para generatePDFThumbnail espera "NombrePDF/NombrePDF.pdf" relativo a processed_files
+                 // Para un fallback, pdfData.name es el nombre completo.
+                 // generateAndSetThumbnail(card, pdfData.name, index); // Necesita que pdfData.name sea la ruta relativa correcta.
+                 console.log("Generación dinámica de miniatura para fallback no implementada robustamente aún.");
+            } else if (!thumbnailUrl && !pdfData.isFallback && pdfData.original_pdf_path_relative) {
+                // Para PDFs procesados sin thumbnail pero con el PDF original disponible
+                generateAndSetThumbnail(card, pdfData.original_pdf_path_relative, index);
+            }
+        });
+    }
+
+    // Ajustar generateAndSetThumbnail para usar la ruta relativa correcta
+    async function generateAndSetThumbnail(card, pdfPathRelativeToProcessedFiles, index) {
+        try {
+            const thumbnailDiv = card.querySelector('.card-thumbnail');
+            if (!thumbnailDiv) return;
+
+            const loadingDiv = thumbnailDiv.querySelector('.card-loading');
+            if(loadingDiv) loadingDiv.style.display = 'block'; // Mostrar loader
+
+            const cacheKey = `pdf_thumbnail_${pdfPathRelativeToProcessedFiles.replace(/[^a-zA-Z0-9]/g, "_")}`;
+            let thumbnailDataUrl = localStorage.getItem(cacheKey);
+            
+            if (!thumbnailDataUrl) {
+                thumbnailDataUrl = await generatePDFThumbnailFromPath(pdfPathRelativeToProcessedFiles); // Nueva función
+                if (thumbnailDataUrl) {
+                    try { localStorage.setItem(cacheKey, thumbnailDataUrl); } catch (e) { console.warn('No se pudo guardar en caché'); }
+                }
+            }
+            
+            if (loadingDiv) loadingDiv.style.display = 'none'; // Ocultar loader
+
+            if (thumbnailDataUrl) {
+                const img = document.createElement('img');
+                img.src = thumbnailDataUrl;
+                img.alt = pdfPathRelativeToProcessedFiles.split('/').pop(); // Nombre del archivo
+                
+                // Limpiar contenido previo (icono y texto) antes de añadir la imagen
+                thumbnailDiv.innerHTML = ''; 
+                thumbnailDiv.appendChild(img);
+                
+                setTimeout(() => { img.classList.add('loaded'); }, 50);
+            } else {
+                console.warn("No se pudo generar miniatura para:", pdfPathRelativeToProcessedFiles);
+                // Mantener el icono PDF y el nombre si la generación falla
+                const p = thumbnailDiv.querySelector('p');
+                if (p) p.textContent = pdfPathRelativeToProcessedFiles.split('/').pop() + " (sin vista previa)";
+            }
+        } catch (error) {
+            console.error(`Error al procesar miniatura para ${pdfPathRelativeToProcessedFiles}:`, error);
+            if (loadingDiv) loadingDiv.style.display = 'none';
+        }
+    }
+
+    // Nueva función para generar miniaturas desde una ruta relativa a processed_files
+    async function generatePDFThumbnailFromPath(pdfPathRelativeToProcessedFiles) {
+        try {
+            const fullPdfUrl = AppConfig.getFullPath('processed_files/' + pdfPathRelativeToProcessedFiles);
+            
+            const loadingTask = pdfjsLib.getDocument(fullPdfUrl);
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 0.3 }); // Escala más pequeña para thumbs
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            return canvas.toDataURL('image/jpeg', 0.6); // Calidad menor para thumbs
+        } catch (error) {
+            console.error('Error al generar la miniatura desde ruta:', pdfPathRelativeToProcessedFiles, error);
+            return null;
+        }
+    }
+
+    // Carga de PDF.js (sin cambios)
+    async function loadPdfJs() {
+        if (typeof pdfjsLib === 'undefined') {
+            const script = document.createElement('script');
+            // Servir pdf.min.js y pdf.worker.min.js localmente desde la carpeta static/js/
+            // Asumiendo que los has descargado y colocado ahí.
+            script.src = AppConfig.getStaticPath('js/pdf.min.js'); // Ajusta el nombre si es diferente
+            document.body.appendChild(script);
+            
+            return new Promise((resolve, reject) => {
+                script.onload = () => {
+                    // El worker también debe ser local
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = AppConfig.getStaticPath('js/pdf.worker.min.js');
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error("Error al cargar pdf.min.js local. Intentando CDN...");
+                    // Fallback a CDN si el local falla
+                    const cdnScript = document.createElement('script');
+                    cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+                    document.body.appendChild(cdnScript);
+                    cdnScript.onload = () => {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                        resolve();
+                    };
+                    cdnScript.onerror = () => reject("Error al cargar PDF.js desde CDN y local.");
+                }
+            });
+        }
+        return Promise.resolve();
+    }
+
+    try {
+        await loadPdfJs();
+        const pdfs = await getPDFList();
+        await renderCatalogCards(pdfs);
+    } catch (e) {
+        console.error("Error en la inicialización del catálogo:", e);
+        const catalogGrid = document.getElementById('catalog-grid');
+        catalogGrid.innerHTML = `<div class="no-docs">Error al cargar la librería PDF. Verifique la consola.</div>`;
+    }
+});
+</script>

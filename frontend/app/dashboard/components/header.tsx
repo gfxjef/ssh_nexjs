@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<{ nombre?: string; username: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifications, setNotifications] = useState(3); // Ejemplo de contador de notificaciones
   const router = useRouter();
@@ -15,7 +15,8 @@ export default function Header() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
       } catch (error) {
         console.error('Failed to parse user data:', error);
       }
@@ -66,9 +67,9 @@ export default function Header() {
               <div className="flex items-center">
                 {/* Avatar placeholder */}
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#d48b45] to-[#be7b3d] flex items-center justify-center text-white shadow-md">
-                  {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                  {user?.nombre?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
-                <span className="ml-2">{user?.username || 'Usuario'}</span>
+                <span className="ml-2">{user?.nombre || user?.username || 'Usuario'}</span>
               </div>
               
               {/* Dropdown arrow */}

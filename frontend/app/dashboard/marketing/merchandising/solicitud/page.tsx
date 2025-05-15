@@ -20,17 +20,37 @@ export default function SolicitudMerchandising() {
   const [productosSeleccionados, setProductosSeleccionados] = useState<string[]>([]);
   const [grupoSeleccionado, setGrupoSeleccionado] = useState<string>('');
   const [mensaje, setMensaje] = useState<{ tipo: 'success' | 'error', texto: string } | null>(null);
-  const [datosUsuario, setDatosUsuario] = useState<{ nombre: string, grupo: string }>({ nombre: '', grupo: '' });
+  const [datosUsuario, setDatosUsuario] = useState<{ nombre: string; grupo: string; username?: string }>({ nombre: '', grupo: '' });
 
   // Simular la carga de datos del usuario al montar el componente
   useEffect(() => {
-    // Simular datos del usuario obtenidos de sessionStorage
-    const usuarioSimulado = { nombre: 'Juan Pérez', grupo: 'kossodo' };
-    setDatosUsuario(usuarioSimulado);
-    setGrupoSeleccionado(usuarioSimulado.grupo);
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        // Priorizar nombre, luego username. Asumir un grupo por defecto si no está.
+        setDatosUsuario({
+          nombre: userData.nombre || userData.usuario || 'Usuario Desconocido',
+          grupo: userData.grupo || 'kossodo', // O un valor por defecto o lógica para determinarlo
+          username: userData.usuario
+        });
+        setGrupoSeleccionado(userData.grupo || 'kossodo');
+        cargarProductos(userData.grupo || 'kossodo');
+      } catch (error) {
+        console.error("Error al parsear datos del usuario del localStorage:", error);
+        // Fallback si hay error
+        setDatosUsuario({ nombre: 'Usuario Desconocido', grupo: 'kossodo' });
+        setGrupoSeleccionado('kossodo');
+        cargarProductos('kossodo');
+      }
+    } else {
+        // Fallback si no hay usuario en localStorage
+        setDatosUsuario({ nombre: 'Usuario Desconocido', grupo: 'kossodo' });
+        setGrupoSeleccionado('kossodo');
+        cargarProductos('kossodo');
+    }
     
-    // Cargar productos iniciales
-    cargarProductos(usuarioSimulado.grupo);
+    // Cargar productos iniciales ya no se llama aquí directamente, se llama dentro del if/else de storedUser
   }, []);
 
   // Función para filtrar productos según la cantidad de packs

@@ -1,0 +1,364 @@
+<!-- Estilos específicos -->
+<style>
+  /* Agregar estilos específicos que no estén en los CSS principales */
+  #flipbook-wrapper {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 80px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  
+  #flipbook {
+    margin: 0 auto;
+  }
+  
+  /* Loader */
+  #loader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Navegación */
+  #navigation {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 20px;
+    z-index: 100;
+  }
+  
+  .nav-btn {
+    background-color: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s;
+  }
+  
+  .nav-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Página */
+  .page-content {
+    background-color: white;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  }
+  
+  /* Responsividad */
+  @media (max-width: 768px) {
+    #flipbook-wrapper {
+      height: calc(100vh - 60px);
+    }
+    
+    .nav-btn {
+      width: 36px;
+      height: 36px;
+    }
+  }
+</style>
+
+<!-- Contenido principal -->
+<main class="main-content">
+  <!-- Loader: se mostrará mientras se carga el PDF y se inicializa el flipbook -->
+  <div id="loader-overlay">
+    <div class="spinner"></div>
+  </div>
+  
+  <!-- Wrapper para centrar y posicionar el flipbook -->
+  <div id="flipbook-wrapper">
+    <div id="flipbook"></div>
+  </div>
+  
+  <!-- Botones de navegación simplificados -->
+  <div id="navigation">
+    <button id="back-catalog" class="nav-btn" title="Volver al catálogo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19Z"></path>
+        <path fill="currentColor" d="M7,7H15V9H7V7M7,11H15V13H7V11M7,15H11V17H7V15Z"></path>
+      </svg>
+    </button>
+    <button id="first-page" class="nav-btn" title="Primera página">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M18.41,7.41L17,6L11,12L17,18L18.41,16.59L13.83,12L18.41,7.41M12.41,7.41L11,6L5,12L11,18L12.41,16.59L7.83,12L12.41,7.41Z"></path>
+      </svg>
+    </button>
+    <button id="prev-page" class="nav-btn" title="Página anterior">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"></path>
+      </svg>
+    </button>
+    <button id="next-page" class="nav-btn" title="Página siguiente">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"></path>
+      </svg>
+    </button>
+    <!-- Nuevo botón de descarga -->
+    <button id="download-pdf" class="nav-btn" title="Descargar PDF">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"></path>
+      </svg>
+    </button>
+  </div>
+</main>
+
+<!-- Scripts específicos -->
+<script>
+// Definiciones globales de loader (deben estar disponibles antes de que otros scripts las usen)
+function showLoader() {
+    const loader = document.getElementById('loader-overlay');
+    if (loader) loader.style.display = 'flex';
+    // console.log("showLoader called"); // Para depuración
+}
+
+function hideLoader() {
+    const loader = document.getElementById('loader-overlay');
+    if (loader) loader.style.display = 'none';
+    // console.log("hideLoader called"); // Para depuración
+}
+
+// Definición de AppConfig y Router (debe estar antes de su uso)
+var AppConfig = {
+  BASE_URL: '{{ pdf_manager_base_url | default("/api/pdfs") | safe }}',
+  STATIC_BASE_URL: '{{ pdf_manager_static_url | default("/api/pdfs/static") | safe }}',
+  
+  _cleanBase: function(url) {
+    return url.replace(/\/+$/, ''); // Elimina solo slashes al final
+  },
+
+  getFullPath: function(relativePath) {
+    const cleanedBaseUrl = this._cleanBase(this.BASE_URL);
+    let path = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    
+    if (relativePath.startsWith('?')) { // Es un query string
+        return cleanedBaseUrl + path; // ej: /api/pdfs?param=val
+    }
+    return cleanedBaseUrl + '/' + path; // ej: /api/pdfs/ruta
+  },
+
+  getStaticPath: function(staticRelativePath) {
+    const cleanedStaticUrl = this._cleanBase(this.STATIC_BASE_URL);
+    let path = staticRelativePath.startsWith('/') ? staticRelativePath.substring(1) : staticRelativePath;
+    return cleanedStaticUrl + '/' + path; // ej: /api/pdfs/static/js/archivo.js
+  }
+};
+
+// Log para depurar AppConfig
+console.log("AppConfig Initialized. BASE_URL:", AppConfig.BASE_URL, "STATIC_BASE_URL:", AppConfig.STATIC_BASE_URL);
+
+var Router = {
+  loadContent: function(pathWithQuery) {
+    window.location.href = AppConfig.getFullPath(pathWithQuery);
+  }
+};
+
+// selectedPDF se declara globalmente para que los scripts de dispositivo puedan accederla.
+// Usar window.selectedPDF explícitamente
+window.selectedPDF = "{{ pdf_url | default('') | safe }}"; // Valor inicial desde el template
+
+document.addEventListener('DOMContentLoaded', function() {
+    async function loadExternalScript(url, localFallbackPath) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = () => {
+                console.warn(`Error cargando script desde ${url}. Intentando fallback local: ${localFallbackPath}`);
+                if (localFallbackPath) {
+                    const fallbackScript = document.createElement('script');
+                    fallbackScript.src = localFallbackPath;
+                    fallbackScript.onload = resolve;
+                    fallbackScript.onerror = () => reject(`Error cargando script desde ${url} y fallback ${localFallbackPath}`);
+                    document.head.appendChild(fallbackScript);
+                } else {
+                    reject(`Error cargando script desde ${url} sin fallback local.`);
+                }
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function inicializarVisorPDF() {
+        try {
+            // Cargar PDF.js desde CDN como primario
+            if (typeof pdfjsLib === 'undefined') {
+                await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js', AppConfig.getStaticPath('js/pdf.min.js'));
+                // Asegurar que el workerSrc también use CDN si pdf.min.js se cargó de CDN
+                // o la ruta local correspondiente si se usó el fallback.
+                if (window.pdfjsLib.GlobalWorkerOptions.workerSrc.includes('cdnjs')) {
+                     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                } else {
+                     window.pdfjsLib.GlobalWorkerOptions.workerSrc = AppConfig.getStaticPath('js/pdf.worker.min.js');
+                }
+                console.log("PDF.js workerSrc set to:", window.pdfjsLib.GlobalWorkerOptions.workerSrc);
+            }
+
+            // Cargar jQuery y luego Turn.js
+            if (typeof $ === 'undefined') {
+                await loadExternalScript('https://code.jquery.com/jquery-3.6.0.min.js', AppConfig.getStaticPath('js/jquery.min.js'));
+            }
+            if (typeof $.fn.turn === 'undefined') {
+                await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/turn.js/0.11/turn.min.js', AppConfig.getStaticPath('js/turn.min.js'));
+            }
+
+            // Cargar el script correspondiente según el dispositivo
+            cargarScriptParaDispositivo();
+            
+            // Configurar eventos de botones
+            document.getElementById('back-catalog').addEventListener('click', function() {
+                Router.loadContent('catalogo'); // Navega a /api/pdfs/catalogo
+            });
+            
+            document.getElementById('download-pdf').addEventListener('click', async function() {
+                const catalogName = window.selectedPDF; // Este es el nombre de la carpeta y el nombre base del PDF
+                if (!catalogName) {
+                    console.error("Error de descarga: Nombre del catálogo (selectedPDF) no definido.");
+                    alert("Error: No se puede identificar el PDF para descargar.");
+                    return;
+                }
+
+                // Asumimos que el archivo PDF tiene el mismo nombre que la carpeta, con extensión .pdf
+                const pdfFileName = catalogName + '.pdf';
+                const pdfPathForApi = catalogName + '/' + pdfFileName; // Ruta relativa: NombreCatalogo/NombreCatalogo.pdf
+                
+                console.log(`Intentando descargar PDF. Nombre de catálogo: ${catalogName}, Nombre de archivo: ${pdfFileName}, Ruta para API: ${pdfPathForApi}`);
+                
+                try {
+                    const fullPath = AppConfig.getFullPath('processed_files/' + pdfPathForApi);
+                    console.log("Ruta completa de descarga construida:", fullPath);
+                    const response = await fetch(fullPath, { method: 'GET' });
+                    
+                    if (!response.ok) {
+                        throw new Error(`No se encontró el archivo en ${fullPath} (status: ${response.status})`);
+                    }
+                    
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = blobUrl;
+                    downloadLink.download = pdfFileName; // Usar el nombre del archivo PDF para la descarga
+                    
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl);
+                        document.body.removeChild(downloadLink);
+                    }, 100);
+                } catch (error) {
+                    console.error('Error al descargar el PDF:', error);
+                    alert('No se pudo descargar el PDF. Ruta intentada: ' + AppConfig.getFullPath('processed_files/' + pdfPathForApi));
+                }
+            });
+
+        } catch (error) {
+            console.error("Error al inicializar librerías para el visor:", error);
+            const loaderOverlay = document.getElementById('loader-overlay');
+            if(loaderOverlay) loaderOverlay.innerHTML = "<p style='color:red; text-align:center;'>Error al cargar componentes. Verifique la consola.</p>";
+        }
+    }
+  
+    // Función para obtener parámetros de URL
+    function getURLParameter(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+    }
+  
+    // Asignar valor a selectedPDF global si no vino del template o está en el query param
+    if (!window.selectedPDF) {
+        const pdfParam = getURLParameter('pdf');
+        if (pdfParam) {
+            window.selectedPDF = decodeURIComponent(pdfParam);
+        } else {
+            console.warn("No se especificó PDF, redirigiendo a catálogo.");
+            hideLoader();
+            Router.loadContent('catalogo');
+            return;
+        }
+    }
+    // Ahora window.selectedPDF es global y tiene el valor correcto.
+    console.log("PDF seleccionado para el visor (window.selectedPDF):", window.selectedPDF);
+      
+    // Detección de dispositivo (sin cambios)
+    function detectarDispositivo() {
+        const ancho = window.innerWidth;
+        if (ancho < 768) return 'mobile';
+        else if (ancho < 1024) return 'tablet';
+        else return 'desktop';
+    }
+  
+    // Cargar el script correspondiente según el dispositivo
+    function cargarScriptParaDispositivo() {
+        const dispositivo = detectarDispositivo();
+        // Construcción de ruta más explícita para depurar el problema de duplicación
+        const staticBase = AppConfig.STATIC_BASE_URL.replace(/^\/+|\/+$/g, ''); // Quita slashes al inicio y final
+        const scriptPath = '/' + staticBase + '/js/' + dispositivo + '.js';
+        console.log("Intentando cargar script de dispositivo desde ruta construida explícitamente:", scriptPath);
+
+        const script = document.createElement('script');
+        script.src = scriptPath;
+        script.onerror = () => console.error(`Error al cargar script para ${dispositivo}: ${scriptPath}`);
+        // No es necesario pasar selectedPDF aquí si desktop.js lo toma de window.selectedPDF
+        document.body.appendChild(script);
+        console.log('Cargado script para: ' + dispositivo);
+    }
+  
+    let tiempoEspera;
+    let dispositivoActual = detectarDispositivo();
+  
+    window.addEventListener('resize', function() {
+        clearTimeout(tiempoEspera);
+        tiempoEspera = setTimeout(function() {
+            const nuevoDispositivo = detectarDispositivo();
+            if (nuevoDispositivo !== dispositivoActual) {
+                console.log('Cambio de dispositivo detectado, recargando...');
+                location.reload();
+            }
+        }, 500);
+    });
+
+    inicializarVisorPDF(); // Llamar a la función principal de inicialización
+
+    // Al final de una inicialización exitosa o en caso de error, el loader debería ocultarse.
+    // Los scripts de dispositivo (desktop.js, etc.) también llaman a hideLoader.
+    // Si inicializarVisorPDF es asíncrono y puede fallar, hideLoader debería estar en su .then() y .catch()
+    // o ser llamado explícitamente por los scripts de dispositivo una vez que terminan su carga.
+});
+</script>
