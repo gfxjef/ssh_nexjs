@@ -167,10 +167,21 @@ def list_usuarios():
 
 # Run the app
 if __name__ == '__main__':
-    print("Iniciando servidor con autenticación MySQL...")
+    from dotenv import load_dotenv
+    load_dotenv()
+    import os
+
+    print("Iniciando servidor principal con autenticación MySQL...")
     print("Para probar la autenticación:")
     print("1. POST /api/auth/login - Body: {'usuario': 'xxx', 'pass': 'xxx'}")
     print("2. GET /api/user/profile - Headers: {'Authorization': 'Bearer xxxxx'}")
     print("3. GET /api/verify/table - Para verificar la estructura de la tabla")
     print("4. GET /api/usuarios - Para listar los primeros 10 usuarios")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+
+    host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_RUN_PORT', 5000))
+    debug_str = os.getenv('FLASK_DEBUG', 'True')
+    debug = debug_str.lower() in ['true', '1', 't', 'y', 'yes']
+
+    print(f"Servidor ejecutándose en {host}:{port} con debug={debug}")
+    app.run(debug=debug, host=host, port=port)

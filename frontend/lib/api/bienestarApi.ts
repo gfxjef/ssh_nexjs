@@ -1,6 +1,7 @@
 import { Category, Post, PostFilters, PostStatus } from '../bienestar/types';
 
-const BASE_URL = 'http://localhost:5000/api/bienestar';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL = `${API_BASE_URL}/api/bienestar`;
 
 // Helper para manejar respuestas de la API
 async function handleResponse<T>(response: Response): Promise<T> {

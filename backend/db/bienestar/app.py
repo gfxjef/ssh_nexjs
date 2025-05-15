@@ -65,9 +65,17 @@ def init_db():
         seed_initial_data()
 
 if __name__ == '__main__':
-    # Inicializar la base de datos
+    from dotenv import load_dotenv
+    load_dotenv()
+    import os
+
     init_db()
-    
-    # Crear y ejecutar la aplicación
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+
+    host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_RUN_PORT', 5001))
+    debug_str = os.getenv('FLASK_DEBUG', 'True')
+    debug = debug_str.lower() in ['true', '1', 't', 'y', 'yes']
+
+    print(f"Servidor del módulo BIENESTAR ejecutándose en {host}:{port} con debug={debug}")
+    app.run(debug=debug, host=host, port=port) 
