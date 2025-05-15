@@ -24,8 +24,10 @@ export default function Login() {
     setError('');
     
     try {
-      // Conectar al backend
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      // Construir la URL completa usando la variable de entorno
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/api/auth/login`;
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

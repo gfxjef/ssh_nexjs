@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
-// Define la URL base de tu backend Flask
-const BACKEND_BASE_URL = 'http://localhost:5000'; 
+// Define la URL base de tu backend Flask usando la variable de entorno
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'; 
 
 // Interfaz para el objeto catálogo como lo devuelve la API del backend
 interface CatalogoFromAPI {
