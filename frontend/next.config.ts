@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   images: {
     domains: ['localhost'],
   },
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Normalizar referencias a jQuery para evitar conflictos de capitalización
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      jQuery: 'jquery', // Mapea jQuery (Q mayúscula) a jquery (minúscula)
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

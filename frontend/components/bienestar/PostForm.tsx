@@ -1,9 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import $ from 'jquery';
+
+if (typeof window !== 'undefined') {
+  (window as any).jQuery = $;
+  (window as any).$ = $;
+}
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Post, Category, PostStatus } from '../../lib/bienestar/types';
 import { usePosts } from '../../app/dashboard/bienestar/context/PostsContext';
-import TinyMCEEditor from '../wysiwyg/TinyMCEEditor';
+// import TinyMCEEditor from '../wysiwyg/TinyMCEEditor'; // Eliminado
+import { ReactSummernoteLite } from '@easylogic/react-summernote-lite';
+import 'summernote/dist/summernote-lite.css';
+// Asegúrate de que jQuery esté disponible globalmente si es necesario para Summernote
+// A veces, simplemente importarlo puede ser suficiente para Webpack/bundlers.
+import 'jquery';
+
 
 interface PostFormProps {
   post?: Post;
@@ -12,16 +25,15 @@ interface PostFormProps {
 }
 
 /**
- * Componente de formulario para crear y editar posts
+ * Componente de formulario para crear y editar posts con Summernote
  */
 export default function PostForm({ post, onClose, isEditMode = false }: PostFormProps) {
   const { addPost, updatePost, getCategories } = usePosts();
   const categories = getCategories();
   
-  // Estados del formulario
   const [titulo, setTitulo] = useState('');
   const [extracto, setExtracto] = useState('');
-  const [contenido, setContenido] = useState('');
+  const [contenido, setContenido] = useState(''); // Este será el valor para Summernote
   const [categoriaId, setCategoriaId] = useState<number>(0);
   const [autor, setAutor] = useState('');
   const [fecha, setFecha] = useState('');
@@ -31,171 +43,162 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const summernoteRef = useRef<any>(null); // Referencia para interactuar con la instancia de Summernote
 
-  // Cargar datos del post si estamos en modo edición
-  useEffect(() => {
-    if (isEditMode && post) {
-      setTitulo(post.titulo);
-      setExtracto(post.extracto);
-      // Asegurarse de que el contenido se maneje adecuadamente, incluso si es null o undefined
-      const postContent = post.contenido || '';
-      console.log("Cargando contenido del post para edición:", postContent.substring(0, 50) + (postContent.length > 50 ? "..." : ""));
-      setContenido(postContent);
-      setCategoriaId(post.categoriaId);
-      setAutor(post.autor);
-      setFecha(post.fecha);
-      setEstado(post.estado);
-      setDestacado(post.destacado);
-      setImagenUrl(post.imagenUrl || '');
-    } else {
-      // Valores por defecto para modo creación
-      setFecha(new Date().toISOString().split('T')[0]);
-      setCategoriaId(categories.length > 0 ? categories[0].id : 0);
-    }
-  }, [post, isEditMode, categories]);
+  // useEffect(() => {
+  //   if (isEditMode && post) {
+  //     setTitulo(post.titulo);
+  //     setExtracto(post.extracto);
+  //     const postContent = post.contenido || '';
+  //     setContenido(postContent);
+  //     // Para Summernote, el contenido se establece mediante onInit o una llamada directa
+  //     // if (summernoteRef.current) {
+  //     //   summernoteRef.current.summernote('code', postContent);
+  //     // }
+  //     setCategoriaId(post.categoriaId);
+  //     setAutor(post.autor);
+  //     setFecha(post.fecha);
+  //     setEstado(post.estado);
+  //     setDestacado(post.destacado);
+  //     setImagenUrl(post.imagenUrl || '');
+  //   } else {
+  //     setFecha(new Date().toISOString().split('T')[0]);
+  //     setCategoriaId(categories.length > 0 ? categories[0].id : 0);
+  //     setContenido(''); // Contenido inicial vacío para creación
+  //     // if (summernoteRef.current) {
+  //     //   summernoteRef.current.summernote('code', '');
+  //     // }
+  //   }
+  // }, [post, isEditMode, categories]);
 
-  // Validar el formulario
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!titulo.trim()) {
-      newErrors.titulo = 'El título es obligatorio';
-    }
-    
-    if (!extracto.trim()) {
-      newErrors.extracto = 'El extracto es obligatorio';
-    }
-    
-    if (!categoriaId) {
-      newErrors.categoriaId = 'Debe seleccionar una categoría';
-    }
-    
-    if (!autor.trim()) {
-      newErrors.autor = 'El autor es obligatorio';
-    }
-    
-    if (!fecha) {
-      newErrors.fecha = 'La fecha es obligatoria';
-    }
-    
+    if (!titulo.trim()) newErrors.titulo = 'El título es obligatorio';
+    if (!extracto.trim()) newErrors.extracto = 'El extracto es obligatorio';
+    if (!categoriaId) newErrors.categoriaId = 'Debe seleccionar una categoría';
+    if (!autor.trim()) newErrors.autor = 'El autor es obligatorio';
+    if (!fecha) newErrors.fecha = 'La fecha es obligatoria';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Manejar envío del formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
+    if (!validateForm()) return;
     setLoading(true);
     
+    // Asegurarse de que el contenido del editor esté actualizado en el estado
+    const currentEditorContent = summernoteRef.current ? summernoteRef.current.summernote('code') : contenido;
+
     try {
-      // Obtener la categoría seleccionada para obtener su nombre
       const selectedCategory = categories.find(cat => cat.id === categoriaId);
-      
-      if (!selectedCategory) {
-        throw new Error('Categoría no válida');
-      }
-      
-      // TODO: Obtener el usuario_id del contexto de autenticación o sesión
-      // Por ahora, si es modo edición y existe post.autor (que podría ser un ID o nombre)
-      // o el estado local `autor` si es creación. El backend espera `usuario_id` para la query.
-      // Si `autor` del estado es un nombre, y el backend espera un ID, esto necesita unificar.
-      // Asumamos por ahora que `autor` del estado es el nombre del autor que el backend puede usar.
+      if (!selectedCategory) throw new Error('Categoría no válida');
 
       const postDataPayload = {
         titulo,
         extracto,
-        contenido,
-        categoria_id: categoriaId, // CAMBIADO: de categoriaId a categoria_id
-        // 'categoria' (nombre) no es necesario para el backend en la creación, 
-        // ya que tiene categoria_id. Se podría omitir del payload de creación.
-        autor: autor, // El backend espera `usuario_id` pero la query usa `autor`.
-                      // Esto necesita una definición clara. Por ahora enviamos `autor`.
-        // fecha, // La fecha la debe poner el backend al crear
+        contenido: currentEditorContent, // Usar el contenido del editor
+        categoria_id: categoriaId,
+        autor,
         estado,
         destacado,
-        imagen_url: imagenUrl, // CAMBIADO: de imagenUrl a imagen_url (aunque ya era así, es bueno revisar)
-        // vistas: isEditMode && post ? post.vistas : 0 // Vistas no se envían al crear/actualizar normalmente
+        imagen_url: imagenUrl,
       };
       
       if (isEditMode && post) {
-        // Para update, el backend podría esperar una estructura similar
-        // o solo los campos que cambian. La función updatePost en api espera Partial<Omit<Post, ...>>
-        // así que los nombres deben coincidir con el tipo Post.
-        // Si el tipo Post usa `categoriaId` y `imagenUrl`, hay que mapear para el update también si es necesario.
-        // O, mejor, alinear el tipo Post.
         await updatePost(post.id, {
-            ...postDataPayload, // Usar el payload alineado
-            categoriaId: postDataPayload.categoria_id, // Mapear de vuelta si updatePost espera categoriaId
-            imagenUrl: postDataPayload.imagen_url // Mapear de vuelta si updatePost espera imagenUrl
-            // Quitar campos que el backend no debe recibir en update o que no son del tipo Post
-        } as any); // Usar 'as any' temporalmente o definir un tipo específico para el payload de update
+            ...postDataPayload,
+            categoriaId: postDataPayload.categoria_id,
+            imagenUrl: postDataPayload.imagen_url,
+        } as any);
       } else {
-        await addPost(postDataPayload as any); // Usar 'as any' o un tipo específico
+        await addPost(postDataPayload as any);
       }
-      
       onClose();
     } catch (error) {
       console.error('Error al guardar post:', error);
+      // Podrías añadir una notificación de error aquí
     } finally {
       setLoading(false);
     }
   };
 
-  // Manejar cambio en el editor de contenido
-  const handleEditorChange = (value: string) => {
-    setContenido(value);
+  // Manejador para cambios en Summernote
+  const handleSummernoteChange = (newContent: string) => {
+    // NO llamar a setContenido aquí para evitar re-renderizados constantes
+    // setContenido(newContent); 
+    
+    // El contenido se leerá directamente desde summernoteRef.current al hacer submit
+    // Puedes mantener el console.log si quieres ver el newContent que Summernote proporciona
+    console.log('Summernote internal onChange. New content provided:', newContent ? newContent.substring(0,50) + '...' : 'empty');
+    // También podemos loguear lo que la ref tiene en ese momento
+    console.log('Current ref content after change:', summernoteRef.current ? summernoteRef.current.summernote('code') : 'ref not set');
   };
 
-  // Función para manejar la subida de imágenes
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Función para manejar la subida de imágenes destacadas (input file)
+  const handleFeaturedImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Mostrar una vista previa local inmediata
     const localPreview = URL.createObjectURL(file);
     setImagenUrl(localPreview);
-
-    // Crear FormData para la subida
     const formData = new FormData();
     formData.append('image', file);
-
     try {
       setLoading(true);
-      const response = await fetch('/api/images/upload', { // Asume que este endpoint existe y funciona
-        method: 'POST',
-        body: formData,
-      });
-
+      const response = await fetch('/api/images/upload', { method: 'POST', body: formData });
       if (!response.ok) {
-        let error;
-        try {
-            error = await response.json();
-        } catch (e) {
-            error = { error: response.statusText || 'Error desconocido al subir imagen' };
-        }
+        const error = await response.json().catch(() => ({ error: response.statusText }));
         throw new Error(error.error || 'Error al subir la imagen');
       }
-
       const data = await response.json();
-      // Actualizar URL con la ruta real de la imagen en el servidor
       setImagenUrl(data.url);
-      // Liberar memoria de la vista previa local si la subida fue exitosa
       URL.revokeObjectURL(localPreview);
     } catch (error) {
       console.error('Error al subir imagen destacada:', error);
-      // Eliminar la vista previa en caso de error si no se ha establecido una imagenUrl del servidor
-      if (imagenUrl === localPreview) {
-        setImagenUrl('');
-      }
-      URL.revokeObjectURL(localPreview); // Siempre liberar la URL del objeto local
-      // Considera mostrar una notificación al usuario aquí
+      if (imagenUrl === localPreview) setImagenUrl('');
+      URL.revokeObjectURL(localPreview);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Callback para la subida de imágenes dentro de Summernote
+  const handleSummernoteImageUpload = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+
+    // Guardar el rango antes de la operación asíncrona
+    if (summernoteRef.current) {
+      summernoteRef.current.summernote('saveRange');
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || 'Error al subir la imagen desde el editor');
+      }
+      const data = await response.json();
+      
+      // Restaurar el rango, enfocar e insertar imagen en Summernote
+      if (summernoteRef.current) {
+        summernoteRef.current.summernote('restoreRange');
+        summernoteRef.current.summernote('focus'); // Re-enfocar el editor
+        summernoteRef.current.summernote('insertImage', data.url);
+      }
+    } catch (error) {
+      console.error('Error en handleSummernoteImageUpload:', error);
+      // Podrías mostrar una notificación al usuario aquí
+      // Si hubo un error, también podría ser útil restaurar el rango si se guardó
+      if (summernoteRef.current) {
+        summernoteRef.current.summernote('restoreRange'); 
+        summernoteRef.current.summernote('focus'); 
+      }
     }
   };
 
@@ -235,10 +238,29 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
         <label htmlFor="contenido" className="block text-sm font-medium text-[#2e3954] mb-1">
           Contenido
         </label>
-        <TinyMCEEditor 
-          value={contenido}
-          onChange={handleEditorChange}
-          placeholder="Escribe el contenido completo del post"
+        <ReactSummernoteLite
+          key="summernote-contenido"
+          id="summernote-contenido"
+          onInit={({ note }: any) => {
+            console.log('Summernote onInit called. Note:', note);
+            summernoteRef.current = note;
+          }}
+          onChange={(content: string) => {
+            console.log('Summernote onChange called. Content:', content ? content.substring(0,50) + '...' : 'empty');
+            handleSummernoteChange(content);
+          }}
+          // placeholder={'Escribe el contenido completo del post'} // Comentado
+          // height={350} // Comentado
+          toolbar={[
+            ['style', ['style']],
+            ['font', ['bold', 'underline', 'clear']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['table', ['table']],
+            ['insert', ['link', 'picture', 'video']],
+            ['view', ['fullscreen', 'codeview', 'help']]
+          ]}
+          onImageUpload={handleSummernoteImageUpload}
         />
       </div>
 
@@ -317,7 +339,6 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
             Imagen destacada
           </label>
           <div className="flex flex-col space-y-2">
-            {/* Campo para URL directa */}
             <div className="flex space-x-2">
               <input
                 type="text"
@@ -327,7 +348,6 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-800 bg-white"
                 placeholder="URL de la imagen destacada"
               />
-              {/* Botón de subir imagen (AHORA ACTIVADO) */}
               <label 
                 htmlFor="fileUpload" 
                 className="px-3 py-2 bg-[#2e3954] text-white rounded-lg cursor-pointer hover:bg-opacity-90 transition flex items-center"
@@ -341,12 +361,11 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
                 type="file"
                 id="fileUpload"
                 accept="image/*"
-                onChange={handleImageUpload}
+                onChange={handleFeaturedImageUpload} // Cambiado aquí
                 className="hidden"
               />
             </div>
             
-            {/* Vista previa de la imagen */}
             {imagenUrl && (
               <div className="mt-2 relative">
                 <div className="relative h-48 bg-gray-100 rounded-lg overflow-hidden">
@@ -384,6 +403,7 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
           </label>
         </div>
       </div>
+
 
       <div className="flex justify-end space-x-3 pt-4">
         <button
