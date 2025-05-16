@@ -8,6 +8,7 @@ import { useNotifications } from '../context/NotificationsContext';
 import PostForm from '../../../../components/bienestar/PostForm';
 import CategoryBadge from '../../../../components/bienestar/CategoryBadge';
 import Notifications from '../../../../components/bienestar/Notifications';
+import { PermissionButton, WithPermission, usePermissions } from '@/lib/permissions';
 
 export default function AdminPosts() {
   // Estados locales para la interfaz
@@ -36,6 +37,7 @@ export default function AdminPosts() {
     categories,
   } = usePosts();
   const { showNotification } = useNotifications();
+  const { userRole } = usePermissions();
   
   // Función para abrir modal en modo crear
   const abrirModalCrear = () => {
@@ -148,15 +150,28 @@ export default function AdminPosts() {
         {/* Cabecera con título y botón de nuevo post */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-[#2e3954]">Administración de Posts</h1>
-          <button
+          <PermissionButton 
+            permissionId="add-post" 
+            variant="primary"
             onClick={abrirModalCrear}
-            className="bg-[#2e3954] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors duration-300 flex items-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Nuevo Post
-          </button>
+            <span className="flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              Nuevo Post
+            </span>
+          </PermissionButton>
+        </div>
+        
+        {/* Información sobre permisos */}
+        <div className="bg-blue-50 p-4 rounded-lg mb-6">
+          <p className="text-blue-600">
+            <strong>Tu rol actual:</strong> {userRole || 'No identificado'}
+          </p>
+          <p className="text-sm text-blue-500 mt-1">
+            Los botones de acciones están controlados por permisos. Solo verás aquellos a los que tienes acceso.
+          </p>
         </div>
         
         {/* Pestañas de Administración */}
@@ -368,15 +383,28 @@ export default function AdminPosts() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-2">
-                              <button
-                                onClick={() => abrirModalEditar(post)}
-                                className="text-indigo-600 hover:text-indigo-900"
-                                title="Editar"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                </svg>
-                              </button>
+                              <WithPermission permissionId="edit-post" type="button">
+                                <button
+                                  onClick={() => abrirModalEditar(post)}
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                  title="Editar"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                  </svg>
+                                </button>
+                              </WithPermission>
+                              <WithPermission permissionId="delete-post" type="button">
+                                <button
+                                  onClick={() => confirmarEliminar(post)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Eliminar"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </WithPermission>
                               <button
                                 onClick={() => cambiarDestacado(post)}
                                 className={post.destacado ? 'text-yellow-500 hover:text-yellow-700' : 'text-gray-400 hover:text-yellow-500'}
@@ -421,15 +449,6 @@ export default function AdminPosts() {
                                   </div>
                                 </div>
                               </div>
-                              <button
-                                onClick={() => confirmarEliminar(post)}
-                                className="text-red-600 hover:text-red-900"
-                                title="Eliminar"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                              </button>
                             </div>
                           </td>
                         </tr>

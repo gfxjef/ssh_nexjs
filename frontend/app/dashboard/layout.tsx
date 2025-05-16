@@ -7,6 +7,7 @@ import Sidebar from '@/app/dashboard/components/sidebar';
 import Header from '@/app/dashboard/components/header';
 import { PostsProvider } from './bienestar/context/PostsContext';
 import { NotificationsProvider } from './bienestar/context/NotificationsContext';
+import { PermissionsProvider } from '@/lib/permissions/PermissionsContext';
 
 export default function DashboardLayout({
   children,
@@ -44,24 +45,26 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-[#f8f9fa]">
-      {/* Sidebar */}
-      <Sidebar />
-      
-      {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header */}
-        <Header />
+    <PermissionsProvider>
+      <div className="flex h-screen bg-[#f8f9fa]">
+        {/* Sidebar */}
+        <Sidebar />
         
-        {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4 md:p-6 bg-[#f8f9fa]">
-          <NotificationsProvider>
-            <PostsProvider>
-              {children}
-            </PostsProvider>
-          </NotificationsProvider>
-        </main>
+        {/* Main Content */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Header */}
+          <Header />
+          
+          {/* Page Content */}
+          <main className="flex-1 overflow-auto p-4 md:p-6 bg-[#f8f9fa]">
+            <NotificationsProvider>
+              <PostsProvider>
+                {children}
+              </PostsProvider>
+            </NotificationsProvider>
+          </main>
+        </div>
       </div>
-    </div>
+    </PermissionsProvider>
   );
 }

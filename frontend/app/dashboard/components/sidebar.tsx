@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { usePermissions } from '@/lib/permissions/PermissionsContext';
 
 // Navigation items with submenus
 const navItems = [
@@ -205,6 +206,7 @@ const MiniCalendar = () => {
 };
 
 export default function Sidebar() {
+  const { userRole, hasMenuAccess } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname() || '';
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
@@ -213,6 +215,11 @@ export default function Sidebar() {
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  
+  // Filtrar los elementos de navegación según los permisos
+  const filteredNavItems = navItems.filter(item => 
+    hasMenuAccess(item.name)
+  );
 
   // Handle search expand/collapse
   const toggleSearch = () => {
@@ -232,7 +239,7 @@ export default function Sidebar() {
     }
   }, [collapsed]);
 
-  // Handle search functionality
+  // Handle search functionality - actualizada para respetar permisos
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredItems([]);
@@ -242,9 +249,9 @@ export default function Sidebar() {
     const query = searchQuery.toLowerCase();
     const results: any[] = [];
 
-    // Search in main menu items
+    // Search in main menu items that the user has access to
     navItems.forEach(item => {
-      if (item.name.toLowerCase().includes(query)) {
+      if (item.name.toLowerCase().includes(query) && hasMenuAccess(item.name)) {
         results.push({
           ...item,
           type: 'main',
@@ -252,10 +259,11 @@ export default function Sidebar() {
         });
       }
 
-      // Search in submenus
+      // Search in submenus the user has access to
       item.submenus.forEach(submenu => {
-        // Solo incluir submenús clicables (que no sean agrupadores)
-        if (submenu.name.toLowerCase().includes(query) && !submenu.isGrouper) {
+        const submenuPath = `${item.name}/${submenu.name}`;
+        // Solo incluir submenús clicables (que no sean agrupadores) y con permisos
+        if (submenu.name.toLowerCase().includes(query) && !submenu.isGrouper && hasMenuAccess(submenuPath)) {
           results.push({
             name: submenu.name,
             parentName: item.name,
@@ -264,10 +272,11 @@ export default function Sidebar() {
           });
         }
 
-        // Search in submenu children
+        // Search in submenu children with permissions
         if (submenu.children) {
           submenu.children.forEach(child => {
-            if (child.name.toLowerCase().includes(query)) {
+            const childPath = `${item.name}/${submenu.name}/${child.name}`;
+            if (child.name.toLowerCase().includes(query) && hasMenuAccess(childPath)) {
               results.push({
                 name: child.name,
                 parentName: `${item.name} > ${submenu.name}`,
@@ -281,7 +290,7 @@ export default function Sidebar() {
     });
 
     setFilteredItems(results);
-  }, [searchQuery]);
+  }, [searchQuery, hasMenuAccess]);
 
   const toggleSubmenu = (menuName: string) => {
     setExpandedMenus(prev => ({
@@ -448,7 +457,7 @@ export default function Sidebar() {
       {/* Navigation - Updated with new color scheme */}
       <nav className="mt-3 px-2 flex-1 overflow-y-auto">
         <div className="space-y-1">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const isMenuActive = pathname.startsWith(`/dashboard/${item.name.toLowerCase().replace(/\s+/g, '-')}`);
             const isExpanded = expandedMenus[item.name] || false;
             
@@ -506,6 +515,10 @@ export default function Sidebar() {
                 {!collapsed && isExpanded && item.submenus.length > 0 && (
                   <div className="mt-1 ml-8 space-y-1">
                     {item.submenus.map((submenu) => {
+                      const submenuPath = `${item.name}/${submenu.name}`;
+                      // Verificar permisos para el submenu
+                      if (!hasMenuAccess(submenuPath)) return null;
+                      
                       const isSubmenuActive = pathname.startsWith(submenu.href);
                       const hasActiveChild = submenu.children && submenu.children.some(child => pathname.startsWith(child.href));
                       const shouldHighlight = isSubmenuActive || (submenu.isGrouper && hasActiveChild);
@@ -553,6 +566,10 @@ export default function Sidebar() {
                           {submenu.children && submenu.children.length > 0 && (
                             <div className="ml-4 mt-1 space-y-1">
                               {submenu.children.map((child) => {
+                                const childPath = `${item.name}/${submenu.name}/${child.name}`;
+                                // Verificar permisos para el elemento hijo
+                                if (!hasMenuAccess(childPath)) return null;
+                                
                                 const isChildActive = pathname === child.href;
                                 
                                 return (
