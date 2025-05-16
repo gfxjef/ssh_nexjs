@@ -31,24 +31,42 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
 
   // Función para subir imágenes
   const handleImageUpload = async (blobInfo: any): Promise<string> => {
+    console.log('[TinyMCE] handleImageUpload triggered. BlobInfo:', blobInfo);
     try {
       const formData = new FormData();
       formData.append('image', blobInfo.blob(), blobInfo.filename());
+      console.log('[TinyMCE] FormData preparado:', formData.get('image'));
       
       const response = await fetch('/api/images/upload', {
         method: 'POST',
         body: formData,
       });
       
+      console.log('[TinyMCE] Respuesta cruda del servidor:', response);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al subir la imagen');
+        let errorText = response.statusText;
+        try {
+            const errorJson = await response.json();
+            console.error('[TinyMCE] Error JSON del servidor:', errorJson);
+            errorText = errorJson.error || errorText;
+        } catch (e) {
+            console.error('[TinyMCE] No se pudo parsear el error JSON:', e);
+        }
+        throw new Error(errorText);
       }
       
       const data = await response.json();
+      console.log('[TinyMCE] Datos JSON de la respuesta:', data);
+      if (!data.url) {
+        console.error('[TinyMCE] La respuesta del servidor no contiene una URL.');
+        throw new Error('La respuesta del servidor no contiene una URL.');
+      }
       return data.url; // Retorna la URL de la imagen subida
     } catch (error) {
-      console.error('Error al subir imagen:', error);
+      console.error('[TinyMCE] Error detallado en handleImageUpload:', error);
+      // Notificar al usuario aquí si es posible, o lanzar para que TinyMCE lo maneje
+      // TinyMCE por defecto muestra un error si la promesa es rechazada.
       throw error;
     }
   };
@@ -118,18 +136,42 @@ export default function TinyMCEEditor({ value, onChange, placeholder = 'Escribe 
           browser_spellcheck: true,
           // Eliminamos el cache_suffix para evitar reinicios
           setup: (editor: any) => {
-            // Desactivar cualquier evento que pueda reiniciar el cursor
             editor.on('BeforeSetContent', (e: any) => {
-              // Siempre permitir establecer contenido durante la inicialización
+              const currentContent = editor.getContent();
+          
+              // 1. Permitir siempre la carga inicial del editor
               if (!initialValueSet.current) {
-                return;
+                console.log('[TinyMCE] BeforeSetContent: Permitiendo carga inicial.');
+                // initialValueSet.current = true; // Esto se maneja en el useEffect ahora
+                // editor.setContent(e.content || ''); // No establecer aquí, ya se hace con initialValue o onInit
+                // lastKnownValueRef.current = e.content || '';
+                return; // Permitir
               }
-              
-              // Bloquear actualizaciones de contenido SOLO cuando el editor tiene foco
-              // Esto previene que el cursor salte al inicio mientras se escribe
+          
+              // 2. Si el editor tiene el foco (el usuario está escribiendo o interactuando directamente)
               if (editorFocused.current) {
-                e.preventDefault();
-                return false;
+                // Heurística para inserción de imagen: si el contenido nuevo contiene una etiqueta de imagen 
+                // que no estaba en el contenido actual, y el formato es html.
+                if (e.format === 'html' && e.content !== currentContent &&
+                    /<img[^>]+src="[^"]+"[^>]*>/.test(e.content) && 
+                    !/<img[^>]+src="[^"]+"[^>]*>/.test(currentContent)) {
+                  console.log('[TinyMCE] BeforeSetContent: Editor enfocado, PERO permitiendo inserción de NUEVA imagen.');
+                  // No hacemos preventDefault aquí, permitimos que la imagen se inserte.
+                  // Es crucial que `lastKnownValueRef` se actualice después para que el siguiente `onChange` no lo duplique.
+                  // Sin embargo, el `onChange` se disparará por el `setContent` que permitimos.
+                } else {
+                  // Para cualquier otra modificación mientras el editor está enfocado (escritura, etc.)
+                  // Prevenir el comportamiento por defecto de setContent para evitar el salto del cursor.
+                  // Nuestro manejador on('Change KeyUp Undo Redo') se encargará de llamar a onChange.
+                  console.log('[TinyMCE] BeforeSetContent: Editor enfocado, PREVINIENDO setContent para escritura normal.');
+                  e.preventDefault();
+                  return false;
+                }
+              } else {
+                // 3. Si el editor NO tiene el foco (ej. setContent programático que no sea la carga inicial)
+                // Podríamos permitirlo, o ser más específicos si es necesario.
+                // Por ahora, si no está enfocado, lo permitimos, asumiendo que es una actualización legítima.
+                console.log('[TinyMCE] BeforeSetContent: Editor NO enfocado, permitiendo setContent.');
               }
             });
           }
