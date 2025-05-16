@@ -233,10 +233,26 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
   const updatePost = useCallback(async (id: number, updates: Partial<Omit<Post, 'id' | 'fecha' | 'vistas' | 'categoria'>>): Promise<Post> => {
     setLoading(true);
     try {
+      const currentPost = allPosts.find(p => p.id === id);
+      if (!currentPost) throw new Error("Post no encontrado para actualizar");
+      
+      // Guardar una copia del post actual por si la respuesta de la API viene sin algunos campos
+      const currentPostBackup = { ...currentPost };
+      
       const updatedPost = await apiUpdatePost(id, updates);
-      setAllPosts(prev => prev.map(p => (p.id === id ? updatedPost : p)));
+      
+      // Asegurarse de que el post actualizado tenga todos los campos necesarios
+      // Si alguno falta, usar el valor del post original
+      const mergedPost = {
+        ...currentPostBackup,  // Primero usamos los datos originales como base
+        ...updatedPost,        // Luego aplicamos los datos actualizados encima
+        // Asegurarnos de que vistas y otros campos vitales existan
+        vistas: updatedPost.vistas !== undefined ? updatedPost.vistas : currentPostBackup.vistas || 0,
+      };
+      
+      setAllPosts(prev => prev.map(p => (p.id === id ? mergedPost : p)));
       showNotification(`Post ID ${id} actualizado correctamente.`, 'success');
-      return updatedPost;
+      return mergedPost;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       showNotification(`Error al actualizar post: ${errorMsg}`, 'error');
@@ -245,7 +261,7 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [showNotification]);
+  }, [showNotification, allPosts]);
 
   const deletePost = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true);
@@ -284,10 +300,26 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentPost = allPosts.find(p => p.id === id);
       if (!currentPost) throw new Error("Post no encontrado para destacar");
+      
+      // Guardar una copia del post actual por si la respuesta de la API viene sin algunos campos
+      const currentPostBackup = { ...currentPost };
+      
       const updatedPost = await apiTogglePostHighlight(id, !currentPost.destacado);
-      setAllPosts(prev => prev.map(p => (p.id === id ? updatedPost : p)));
+      
+      // Asegurarse de que el post actualizado tenga todos los campos necesarios
+      // Si alguno falta, usar el valor del post original
+      const mergedPost = {
+        ...currentPostBackup,  // Primero usamos los datos originales como base
+        ...updatedPost,        // Luego aplicamos los datos actualizados encima
+        // Asegurarnos de que vistas y otros campos vitales existan
+        vistas: updatedPost.vistas !== undefined ? updatedPost.vistas : currentPostBackup.vistas || 0,
+        // Forzar el valor inverso al estado actual para asegurar que el cambio se vea inmediatamente
+        destacado: !currentPostBackup.destacado,
+      };
+      
+      setAllPosts(prev => prev.map(p => (p.id === id ? mergedPost : p)));
       showNotification(`Destacado del Post ID ${id} cambiado.`, 'success');
-      return updatedPost;
+      return mergedPost;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       showNotification(`Error al cambiar destacado: ${errorMsg}`, 'error');
@@ -301,10 +333,26 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
   const changeStatus = useCallback(async (id: number, status: PostStatus): Promise<Post> => {
     setLoading(true);
     try {
+      const currentPost = allPosts.find(p => p.id === id);
+      if (!currentPost) throw new Error("Post no encontrado para cambiar estado");
+      
+      // Guardar una copia del post actual por si la respuesta de la API viene sin algunos campos
+      const currentPostBackup = { ...currentPost };
+      
       const updatedPost = await apiChangePostStatus(id, status);
-      setAllPosts(prev => prev.map(p => (p.id === id ? updatedPost : p)));
+      
+      // Asegurarse de que el post actualizado tenga todos los campos necesarios
+      // Si alguno falta, usar el valor del post original
+      const mergedPost = {
+        ...currentPostBackup,  // Primero usamos los datos originales como base
+        ...updatedPost,        // Luego aplicamos los datos actualizados encima
+        // Asegurarnos de que vistas y otros campos vitales existan
+        vistas: updatedPost.vistas !== undefined ? updatedPost.vistas : currentPostBackup.vistas || 0,
+      };
+      
+      setAllPosts(prev => prev.map(p => (p.id === id ? mergedPost : p)));
       showNotification(`Estado del Post ID ${id} cambiado a ${status}.`, 'success');
-      return updatedPost;
+      return mergedPost;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       showNotification(`Error al cambiar estado: ${errorMsg}`, 'error');

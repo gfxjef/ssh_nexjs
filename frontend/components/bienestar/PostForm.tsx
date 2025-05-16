@@ -33,7 +33,7 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
   
   const [titulo, setTitulo] = useState('');
   const [extracto, setExtracto] = useState('');
-  const [contenido, setContenido] = useState(''); // Este será el valor para Summernote
+  const [contenido, setContenido] = useState(''); // Aunque no lo usemos para setear en cada onChange del editor, es bueno tenerlo por si se necesita el valor inicial.
   const [categoriaId, setCategoriaId] = useState<number>(0);
   const [autor, setAutor] = useState('');
   const [fecha, setFecha] = useState('');
@@ -43,33 +43,46 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const summernoteRef = useRef<any>(null); // Referencia para interactuar con la instancia de Summernote
+  const summernoteRef = useRef<any>(null);
+  const isEditorInitializedRef = useRef(false); // Nuevo ref para controlar la inicialización del contenido
+  const currentPostIdRef = useRef<string | number | undefined>(undefined); // Para detectar si el post ha cambiado
 
-  // useEffect(() => {
-  //   if (isEditMode && post) {
-  //     setTitulo(post.titulo);
-  //     setExtracto(post.extracto);
-  //     const postContent = post.contenido || '';
-  //     setContenido(postContent);
-  //     // Para Summernote, el contenido se establece mediante onInit o una llamada directa
-  //     // if (summernoteRef.current) {
-  //     //   summernoteRef.current.summernote('code', postContent);
-  //     // }
-  //     setCategoriaId(post.categoriaId);
-  //     setAutor(post.autor);
-  //     setFecha(post.fecha);
-  //     setEstado(post.estado);
-  //     setDestacado(post.destacado);
-  //     setImagenUrl(post.imagenUrl || '');
-  //   } else {
-  //     setFecha(new Date().toISOString().split('T')[0]);
-  //     setCategoriaId(categories.length > 0 ? categories[0].id : 0);
-  //     setContenido(''); // Contenido inicial vacío para creación
-  //     // if (summernoteRef.current) {
-  //     //   summernoteRef.current.summernote('code', '');
-  //     // }
-  //   }
-  // }, [post, isEditMode, categories]);
+  useEffect(() => {
+    // Si el post cambia (o pasamos de tener un post a no tenerlo, o viceversa),
+    // reseteamos el flag de inicialización del editor.
+    if (post?.id !== currentPostIdRef.current || (post && !currentPostIdRef.current) || (!post && currentPostIdRef.current)) {
+      isEditorInitializedRef.current = false;
+      currentPostIdRef.current = post?.id;
+    }
+
+    if (isEditMode && post) {
+      setTitulo(post.titulo);
+      setExtracto(post.extracto);
+      setContenido(post.contenido || ''); // Guardar el contenido original en el estado de React
+      setCategoriaId(post.categoriaId);
+      setAutor(post.autor);
+      setFecha(post.fecha);
+      setEstado(post.estado);
+      setDestacado(post.destacado);
+      setImagenUrl(post.imagenUrl || '');
+      // La carga del contenido en Summernote se hará en onInit y solo una vez
+    } else {
+      setTitulo('');
+      setExtracto('');
+      setContenido('');
+      setFecha(new Date().toISOString().split('T')[0]);
+      setCategoriaId(categories.length > 0 ? categories[0].id : 0);
+      setAutor('');
+      setEstado('borrador');
+      setDestacado(false);
+      setImagenUrl('');
+      isEditorInitializedRef.current = false; // Resetear para el modo "nuevo post"
+      if (summernoteRef.current) {
+        console.log('useEffect: Clearing editor for new post mode');
+        summernoteRef.current.summernote('code', '');
+      }
+    }
+  }, [post, isEditMode, categories]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -125,14 +138,9 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
 
   // Manejador para cambios en Summernote
   const handleSummernoteChange = (newContent: string) => {
-    // NO llamar a setContenido aquí para evitar re-renderizados constantes
-    // setContenido(newContent); 
-    
-    // El contenido se leerá directamente desde summernoteRef.current al hacer submit
-    // Puedes mantener el console.log si quieres ver el newContent que Summernote proporciona
+    // No actualizamos el estado `contenido` de React aquí para evitar re-renderizados
+    // que reinicien el editor. El valor se obtiene de la ref al hacer submit.
     console.log('Summernote internal onChange. New content provided:', newContent ? newContent.substring(0,50) + '...' : 'empty');
-    // También podemos loguear lo que la ref tiene en ese momento
-    console.log('Current ref content after change:', summernoteRef.current ? summernoteRef.current.summernote('code') : 'ref not set');
   };
 
   // Función para manejar la subida de imágenes destacadas (input file)
@@ -242,15 +250,27 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
           key="summernote-contenido"
           id="summernote-contenido"
           onInit={({ note }: any) => {
-            console.log('Summernote onInit called. Note:', note);
+            console.log('Summernote onInit called. isEditorInitializedRef:', isEditorInitializedRef.current, 'isEditMode:', isEditMode);
             summernoteRef.current = note;
+            if (isEditMode && post && post.contenido && !isEditorInitializedRef.current && summernoteRef.current) {
+              console.log('Setting editor content in onInit (edit mode - first time):', post.contenido.substring(0,50) + '...');
+              summernoteRef.current.summernote('code', post.contenido);
+              isEditorInitializedRef.current = true;
+            } else if (!isEditMode && !isEditorInitializedRef.current && summernoteRef.current) {
+              console.log('Setting editor to empty in onInit (new mode - first time).');
+              summernoteRef.current.summernote('code', '');
+              isEditorInitializedRef.current = true; // También marcar como inicializado para modo nuevo
+            } else if (summernoteRef.current) {
+              // Si ya está inicializado y volvemos a onInit (ej. por un HMR), 
+              // restaurar el contenido actual del editor para no perderlo.
+              // Pero OJO: esto puede ser complicado si el contenido real que queremos es el del `post` que acaba de cambiar.
+              // Por ahora, priorizamos no perder lo que el usuario ya escribió si es un HMR.
+              console.log('onInit after already initialized. Content in ref:', summernoteRef.current.summernote('code').substring(0,50)+'...');
+            }
           }}
           onChange={(content: string) => {
-            console.log('Summernote onChange called. Content:', content ? content.substring(0,50) + '...' : 'empty');
             handleSummernoteChange(content);
           }}
-          // placeholder={'Escribe el contenido completo del post'} // Comentado
-          // height={350} // Comentado
           toolbar={[
             ['style', ['style']],
             ['font', ['bold', 'underline', 'clear']],
