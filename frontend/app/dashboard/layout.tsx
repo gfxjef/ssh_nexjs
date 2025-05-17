@@ -46,17 +46,17 @@ export default function DashboardLayout({
 
   return (
     <PermissionsProvider>
-      <div className="flex h-screen bg-[#f8f9fa]">
+      <div className="flex h-screen bg-[#ffffff]">
         {/* Sidebar */}
         <Sidebar />
         
         {/* Main Content */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden bg-[#f8f7fa]">
           {/* Header */}
           <Header />
           
           {/* Page Content */}
-          <main className="flex-1 overflow-auto p-4 md:p-6 bg-[#f8f9fa]">
+          <main className="flex-1 overflow-auto p-4 md:p-6 bg-[#f8f7fa]">
             <NotificationsProvider>
               <PostsProvider>
                 {children}

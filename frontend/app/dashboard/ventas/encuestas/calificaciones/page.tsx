@@ -10,7 +10,25 @@ import {
   getStartOfMonth,
   getEndOfMonth,
   isDateInRange
-} from '../../../../../lib/utils/dateUtils'; // Importar utilidades de fecha
+} from '../../../../../lib/utils/dateUtils';
+
+// Importaciones de MUI y ApexCharts
+import {
+  Grid,
+  Card,
+  CardContent,
+  Stack,
+  Box,
+  Typography,
+  Avatar,
+  Container,
+  TextField,
+  IconButton, // <-- Añadir IconButton
+} from '@mui/material';
+import Chart from 'react-apexcharts';
+import { IconArrowUpLeft, IconArrowDownRight } from '@tabler/icons-react';
+import ClearIcon from '@mui/icons-material/Clear'; // <-- Añadir ClearIcon (o CloseIcon)
+import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined'; // <-- Importar el icono de chat
 
 // Importaciones de Chart.js
 import {
@@ -28,51 +46,82 @@ import {
 } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 
-// Registrar los componentes de Chart.js que vamos a utilizar
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-  ArcElement,
-  BarElement
+  CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler, ArcElement, BarElement
 );
 
 // Definir interfaces para los datos del gráfico
-interface LineChartDataset { // Renombrado para claridad
-  label: string;
-  data: number[];
-  borderColor: string;
-  backgroundColor: string;
-  tension: number;
-  fill?: boolean; 
+interface LineChartDataset { label: string; data: number[]; borderColor: string; backgroundColor: string; tension: number; fill?: boolean; }
+interface PieChartDataset { label?: string; data: number[]; backgroundColor: string[]; borderColor: string[]; borderWidth?: number; }
+interface ChartDataState<T = LineChartDataset | PieChartDataset> { labels: string[]; datasets: T[]; }
+
+// --- INICIO: Nuevo componente SummaryStatCard y configuración de ApexCharts ---
+
+interface SummaryStatCardProps {
+  title: string;
+  value: string | number;
+  seriesData: { name: string; color: string; data: number[] }[];
+  trendDirection?: 'up' | 'down';
+  trendPercentage?: string;
 }
 
-interface PieChartDataset {
-  label?: string; // Label para el dataset general, puede ser opcional para pastel
-  data: number[];
-  backgroundColor: string[];
-  borderColor: string[];
-  borderWidth?: number;
-}
+const defaultApexAreaOptions: any = {
+  chart: { type: 'area', fontFamily: "'Plus Jakarta Sans', sans-serif;", foreColor: '#adb0bb', toolbar: { show: false }, height: 45, sparkline: { enabled: true }, group: 'sparklines' },
+  stroke: { curve: 'smooth', width: 2 },
+  fill: { type: 'solid', opacity: 0.05 },
+  markers: { size: 0 },
+  tooltip: { theme: 'dark', x: { show: false }, y: { formatter: (val: number) => val.toString(), title: { formatter: (seriesName: string) => '' } } },
+  xaxis: { labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+  yaxis: { labels: { show: false } },
+  grid: { show: false, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+};
 
-interface ChartDataState<T = LineChartDataset | PieChartDataset> { // Hacerlo genérico
-  labels: string[];
-  datasets: T[];
-}
+const SummaryStatCard: React.FC<SummaryStatCardProps> = ({
+  title,
+  value,
+  seriesData,
+  trendDirection,
+  trendPercentage,
+}) => {
+  const TrendIcon = trendDirection === 'up' ? IconArrowUpLeft : IconArrowDownRight;
+  const trendIconColor = trendDirection === 'up' ? '#39B69A' : '#FA896B';
 
-// Datos de ejemplo para la tabla
-const datosCalificaciones = [
-  { id: 1, asesor: 'Juan Pérez', nombres: 'Importadora XYZ S.A.C.', calificacion: 'Bueno', tipo: 'Venta (OT)' },
-  { id: 2, asesor: 'María García', nombres: 'Distribuidora ABC E.I.R.L.', calificacion: 'Regular', tipo: 'Conformidad' },
-  { id: 3, asesor: 'Carlos López', nombres: 'Comercial 123 S.A.', calificacion: 'Malo', tipo: 'Venta (OT)' },
-  { id: 4, asesor: 'Ana Martínez', nombres: 'Inversiones DEF S.R.L.', calificacion: 'Bueno', tipo: 'Conformidad' },
-  { id: 5, asesor: 'Pedro Sánchez', nombres: 'Corporación GHI S.A.C.', calificacion: 'Bueno', tipo: 'Venta (OT)' },
-];
+  const chartOptions = {
+    ...defaultApexAreaOptions,
+    colors: seriesData.map(s => s.color),
+    fill: { ...defaultApexAreaOptions.fill, colors: seriesData.map(s => s.color) },
+  };
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <CardContent sx={{ padding: '10px', paddingBottom: '2px !important' }}> 
+        <Typography variant="caption" color="text.secondary" fontWeight={500} display="block" mb={0.15}> 
+          {title}
+        </Typography>
+        <Typography variant="h5" fontWeight={700} mb={0.15} lineHeight={1.2}> 
+          {value}
+        </Typography>
+        {trendDirection && trendPercentage && (
+          <Stack direction="row" spacing={0.5} alignItems="center" mb={0.25}>
+            <Avatar sx={{ bgcolor: trendDirection === 'up' ? 'success.light' : 'error.light', width: 18, height: 18 }}> 
+              <TrendIcon width={12} color={trendIconColor} /> 
+            </Avatar>
+            <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.7rem' }}> 
+              {trendPercentage}
+            </Typography>
+          </Stack>
+        )}
+      </CardContent>
+      {seriesData && seriesData.length > 0 && seriesData[0].data.length > 0 && (
+         <Box sx={{ marginTop: trendDirection ? 0 : '4px', width: '100%' }}> 
+            <Chart options={chartOptions} series={seriesData} type="area" height="45px" width="100%" /> 
+        </Box>
+      )}
+    </Card>
+  );
+};
+
+// --- FIN: Nuevo componente SummaryStatCard ---
 
 export default function RegistroCalificaciones() {
   // Estados para modales
@@ -93,6 +142,8 @@ export default function RegistroCalificaciones() {
   const [filtroPeriodo, setFiltroPeriodo] = useState<string>('');
   const [fechaInicioFiltro, setFechaInicioFiltro] = useState<string>('');
   const [fechaFinFiltro, setFechaFinFiltro] = useState<string>('');
+  const [filtroDocumento, setFiltroDocumento] = useState<string>('');
+  const [valorInputDocumento, setValorInputDocumento] = useState<string>(''); // Estado para el valor inmediato del input
 
   // Estados para la paginación de la tabla principal
   const [paginaActual, setPaginaActual] = useState<number>(1);
@@ -126,7 +177,7 @@ export default function RegistroCalificaciones() {
 
   // Estados para el gráfico de barras de Percepción por Grupo
   const [percepcionGrupoBarChartData, setPercepcionGrupoBarChartData] = useState<ChartDataState<LineChartDataset>>({
-    labels: [], // Los grupos serán las etiquetas
+    labels: [],
     datasets: [],
   });
   const [percepcionGrupoBarChartOptions, setPercepcionGrupoBarChartOptions] = useState({});
@@ -225,6 +276,22 @@ export default function RegistroCalificaciones() {
   // Lógica de filtrado (versión inicial, se refinará)
   const encuestasFiltradas = useMemo(() => {
     return allEncuestas.filter(encuesta => {
+      // Filtro por Documento, Nombre o RUC (MODIFICADO)
+      if (filtroDocumento) {
+        const terminoBusqueda = filtroDocumento.toLowerCase().trim();
+        const nombreEncuesta = encuesta.nombres ? encuesta.nombres.toLowerCase().trim() : '';
+        const documentoEncuesta = encuesta.documento ? encuesta.documento.toLowerCase().trim() : '';
+        const rucEncuesta = encuesta.ruc ? encuesta.ruc.toLowerCase().trim() : '';
+
+        if (!(
+          nombreEncuesta.includes(terminoBusqueda) || 
+          documentoEncuesta.includes(terminoBusqueda) || 
+          rucEncuesta.includes(terminoBusqueda)
+        )) {
+          return false;
+        }
+      }
+
       if (filtroAsesor && (!encuesta.asesor || encuesta.asesor.toLowerCase() !== filtroAsesor.toLowerCase())) {
         return false;
       }
@@ -307,7 +374,7 @@ export default function RegistroCalificaciones() {
 
       return true;
     });
-  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroCalificacion, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro]);
+  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroCalificacion, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro, filtroDocumento]); // <-- CORRECTO: filtroDocumento SÍ afecta a encuestasFiltradas
 
   // Lógica de paginación para la tabla principal
   const encuestasPaginadas = useMemo(() => {
@@ -335,7 +402,7 @@ export default function RegistroCalificaciones() {
   // y también cuando el conjunto de datos `allEncuestas` cambia (por ejemplo, al cargar inicialmente).
   useEffect(() => {
     setPaginaActual(1);
-  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroCalificacion, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro]);
+  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroCalificacion, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro, filtroDocumento]); // <-- Añadir filtroDocumento a las dependencias
 
   // Encuestas filtradas solo por asesor, grupo y período (para tarjetas y gráficos de pastel)
   const encuestasParaKPIsYPasteles = useMemo(() => {
@@ -415,18 +482,55 @@ export default function RegistroCalificaciones() {
       }
       return true;
     });
-  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro]);
+  }, [allEncuestas, filtroAsesor, filtroGrupo, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro]); // <-- CORREGIDO: filtroDocumento NO debe estar aquí
 
   // Datos para las tarjetas de resumen
-  const summaryCardData = useMemo(() => {
-    return {
+  const summaryDataForCards = useMemo(() => {
+    const data = {
       total: encuestasParaKPIsYPasteles.length,
-      bueno: encuestasParaKPIsYPasteles.filter((e: EnvioEncuesta) => e.calificacion === 'Bueno').length,
-      malo: encuestasParaKPIsYPasteles.filter((e: EnvioEncuesta) => e.calificacion === 'Malo').length,
-      regular: encuestasParaKPIsYPasteles.filter((e: EnvioEncuesta) => e.calificacion === 'Regular').length,
-      calificadas: encuestasParaKPIsYPasteles.filter((e: EnvioEncuesta) => e.calificacion && e.calificacion.trim() !== '').length,
-      confirmadas: encuestasParaKPIsYPasteles.filter((e: EnvioEncuesta) => e.conformidad && e.conformidad.trim() !== '').length,
+      bueno: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Bueno').length,
+      malo: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Malo').length,
+      regular: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Regular').length,
+      calificadas: encuestasParaKPIsYPasteles.filter(e => e.calificacion && e.calificacion.trim() !== '').length,
+      confirmadas: encuestasParaKPIsYPasteles.filter(e => e.conformidad && e.conformidad.trim() !== '' && e.conformidad !== 'Pendiente').length, // Ajustado para no contar pendientes
     };
+
+    const cardTypes: Array<{
+      type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas';
+      title: string;
+      color: string;
+    }> = [
+      { type: 'Total', title: 'Encuestas Totales', color: '#5D87FF' },
+      { type: 'Bueno', title: 'Buenas', color: '#39B69A' },
+      { type: 'Malo', title: 'Malas', color: '#FA896B' },
+      { type: 'Regular', title: 'Regulares', color: '#FFAE1F' },
+      { type: 'Calificadas', title: 'Calificadas', color: '#7460EE' },
+      { type: 'Confirmadas', title: 'Confirmadas', color: '#6A1B9A' },
+    ];
+    const miniChartDataPoints = 10; //
+    //  Define el número de puntos para los minigráficos
+    return cardTypes.map(cardConfig => {
+      const series = generateDailySeriesData(encuestasParaKPIsYPasteles, cardConfig.type, miniChartDataPoints);
+
+      const trend = calculateTrendFromSeries(series);
+      let currentValue = 0;
+      switch (cardConfig.type) {
+          case 'Total': currentValue = data.total; break;
+          case 'Bueno': currentValue = data.bueno; break;
+          case 'Malo': currentValue = data.malo; break;
+          case 'Regular': currentValue = data.regular; break;
+          case 'Calificadas': currentValue = data.calificadas; break;
+          case 'Confirmadas': currentValue = data.confirmadas; break;
+      }
+
+      return {
+        title: cardConfig.title,
+        value: currentValue,
+        series: [{ name: cardConfig.title, data: series, color: cardConfig.color }],
+        trendDirection: trend.direction,
+        trendPercentage: trend.percentage,
+      };
+    });
   }, [encuestasParaKPIsYPasteles]);
 
   // Top 7 Asesores por cantidad de calificaciones "Bueno"
@@ -515,13 +619,13 @@ export default function RegistroCalificaciones() {
   useEffect(() => {
     // Usar las encuestas ya filtradas por periodo, asesor, grupo
 
-    if (!loading && encuestasFiltradas.length > 0) {
-      // Procesar encuestasFiltradas para generar labels y datasets para el gráfico de LÍNEAS
+    // Procesar datos para el gráfico de LÍNEAS (Tendencia de Calificaciones)
+    // ESTE GRÁFICO DEBE USAR encuestasParaKPIsYPasteles para NO ser afectado por filtroDocumento
+    if (!loading && encuestasParaKPIsYPasteles.length > 0) {
       const procesarDatosParaGraficoLineas = () => {
-        // Agrupar por fecha (timestamp) y contar calificaciones
         const agrupadoPorFecha: { [fecha: string]: { Malo: number, Regular: number, Bueno: number } } = {};
 
-        encuestasFiltradas.forEach(encuesta => {
+        encuestasParaKPIsYPasteles.forEach(encuesta => { // <-- CAMBIO AQUÍ: usar encuestasParaKPIsYPasteles
           if (encuesta.timestamp && encuesta.calificacion) {
             const fecha = new Date(encuesta.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
             if (!agrupadoPorFecha[fecha]) {
@@ -533,7 +637,6 @@ export default function RegistroCalificaciones() {
           }
         });
 
-        // Ordenar las fechas
         const labelsOrdenados = Object.keys(agrupadoPorFecha).sort((a, b) => {
             const [dayA, monthA, yearA] = a.split('/');
             const [dayB, monthB, yearB] = b.split('/');
@@ -548,8 +651,7 @@ export default function RegistroCalificaciones() {
               data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha].Malo),
               borderColor: 'rgba(255, 99, 132, 1)',
               backgroundColor: 'rgba(255, 99, 132, 0.2)',
-              tension: 0.1, // Para suavizar la línea
-              // fill: true, // Si se quiere rellenar el área bajo la línea
+              tension: 0.1,
             },
             {
               label: 'Regular',
@@ -573,11 +675,10 @@ export default function RegistroCalificaciones() {
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: 'top' as const, // 'top' | 'left' | 'bottom' | 'right' | 'chartArea'
+              position: 'top' as const,
             },
             title: {
-              display: false, // El título ya está en el div contenedor
-              text: 'Tendencia de Calificaciones',
+              display: false,
             },
             tooltip: {
               mode: 'index' as const,
@@ -597,20 +698,16 @@ export default function RegistroCalificaciones() {
                 text: 'Cantidad de Calificaciones',
               },
               beginAtZero: true,
-              // Sugerir un máximo basado en los datos o permitir que sea automático
-              // suggestedMax: ...
             },
           },
         });
       };
-
       procesarDatosParaGraficoLineas();
-    } else if (!loading && encuestasFiltradas.length === 0) {
-        // Si no hay datos filtrados, limpiar el gráfico de líneas
+    } else if (!loading && encuestasParaKPIsYPasteles.length === 0) { // <-- CAMBIO AQUÍ también para la condición de limpieza
         setChartData({ labels: [], datasets: [] });
     }
 
-    // Procesar datos para el gráfico de pastel de VENTAS
+    // Procesar datos para el gráfico de pastel de VENTAS (ya usa encuestasParaKPIsYPasteles, correcto)
     if (!loading && encuestasParaKPIsYPasteles && encuestasParaKPIsYPasteles.length > 0) {
       const encuestasVentas = encuestasParaKPIsYPasteles.filter(
         (e: EnvioEncuesta) => e.tipo === 'Ventas (OT)' || e.tipo === 'Ventas (OC)'
@@ -824,9 +921,20 @@ export default function RegistroCalificaciones() {
       setPercepcionGrupoBarChartData({ labels: [], datasets: [] });
     }
 
-  }, [encuestasFiltradas, loading, encuestasParaKPIsYPasteles]);
+  }, [loading, encuestasParaKPIsYPasteles]); // <-- Dependencia principal para este efecto ahora es encuestasParaKPIsYPasteles y loading
 
-  if (loading) {
+  // Efecto para debounce del filtro de documento
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setFiltroDocumento(valorInputDocumento);
+    }, 500); // 500ms de debounce, puedes ajustarlo
+
+    return () => {
+      clearTimeout(timerId);
+    };
+  }, [valorInputDocumento]);
+
+  if (loading && !allEncuestas.length) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#d48b45]"></div>
@@ -844,8 +952,37 @@ export default function RegistroCalificaciones() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-[#2e3954] mb-6">Registro de Calificaciones</h1>
+    <Container maxWidth="xl" disableGutters sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, sm: 3, md: 4 } }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" component="h1" color="text.primary" fontWeight={600}>
+          Registro de Calificaciones
+        </Typography>
+        <TextField 
+          variant="outlined"
+          size="small"
+          placeholder="Buscar por documento..."
+          value={valorInputDocumento} // Usar el estado del valor inmediato del input
+          onChange={(e) => setValorInputDocumento(e.target.value)} // Actualizar el valor inmediato del input
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 250 } }} // Ancho responsivo
+          InputProps={{
+            endAdornment: (
+              valorInputDocumento && ( // Mostrar la X basado en valorInputDocumento
+                <IconButton
+                  aria-label="limpiar búsqueda"
+                  onClick={() => {
+                    setValorInputDocumento('');
+                    // setFiltroDocumento(''); // Opcional: limpiar filtro inmediatamente o dejar que el debounce lo haga
+                  }}
+                  edge="end"
+                  size="small"
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              )
+            )
+          }}
+        />
+      </Box>
       
       {/* Modal de Detalles */}
       {mostrarModalDetalles && detalleSeleccionado && (
@@ -987,33 +1124,44 @@ export default function RegistroCalificaciones() {
         </div>
       )}
       
-      {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Encuestas Totales</h3>
-          <p className="text-2xl font-semibold text-[#2e3954]">{summaryCardData.total}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Buenas</h3>
-          <p className="text-2xl font-semibold text-green-600">{summaryCardData.bueno}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Malas</h3>
-          <p className="text-2xl font-semibold text-red-600">{summaryCardData.malo}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Regulares</h3>
-          <p className="text-2xl font-semibold text-yellow-600">{summaryCardData.regular}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Calificadas</h3>
-          <p className="text-2xl font-semibold text-blue-600">{summaryCardData.calificadas}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Confirmadas</h3>
-          <p className="text-2xl font-semibold text-purple-600">{summaryCardData.confirmadas}</p>
-        </div>
-      </div>
+      {/* NUEVA SECCIÓN DE TARJETAS DE RESUMEN con MUI y ApexCharts */}
+      <Grid
+        container
+        spacing={1} // Mantenemos el spacing reducido
+        // wrap="wrap" // wrap es el comportamiento por defecto, no es estrictamente necesario
+        // justifyContent="space-between" // Podría ser útil si sobra espacio, pero con flexBasis debería ser exacto
+        mb={4}
+      >
+        {summaryDataForCards.map((cardData, index) => (
+          // @ts-ignore // Temporalmente ignoramos el error de linter del Grid mientras se investiga.
+          <Grid
+            item
+            component="div" // Necesario para que sx funcione correctamente con flexBasis/maxWidth en algunas versiones/contextos
+            key={index}
+            xs={12}  // 1 tarjeta por fila en extra-small
+            sm={6}   // 2 tarjetas por fila en small (50%)
+            md={2}   // Esto se anulará por el sx de abajo, pero es bueno tenerlo para claridad
+            sx={{
+              flexGrow: 1, // Permitir que crezca si hay espacio (aunque maxWidth lo limita)
+              flexShrink: 0, // No permitir que se encoja más de su flexBasis
+              flexBasis: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(16.6667% - 8px)' }, // 8px es aprox el spacing (1 * 8px)
+              maxWidth: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(16.6667% - 8px)' },
+              // Ajuste para el espaciado: el spacing={1} añade 4px de padding a cada lado del item.
+              // Para que 6 items con spacing 1 ocupen el 100%, cada uno debe ser un poco menos de 16.6667%
+              // Alternativamente, el contenedor Grid podría tener márgenes negativos para compensar, lo cual MUI hace por defecto.
+              // La solución más simple si `md={2}` y `spacing={1}` no funcionan es ajustar el `flexBasis` y `maxWidth` como arriba.
+            }}
+          >
+            <SummaryStatCard
+              title={cardData.title} 
+              value={cardData.value} 
+              seriesData={cardData.series}
+              trendDirection={cardData.trendDirection as 'up' | 'down' | undefined}
+              trendPercentage={cardData.trendPercentage}
+            />
+          </Grid>
+        ))}
+      </Grid>
       
       <div>
         {/* Filtros */}
@@ -1280,14 +1428,25 @@ export default function RegistroCalificaciones() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-800">{item.tipo || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => abrirModalDetalles(item.idcalificacion)}
-                        className="inline-flex items-center justify-center p-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
+                      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.5}>
+                        {item.observaciones && item.observaciones.trim() !== '' && (
+                          <ChatBubbleOutlineOutlinedIcon 
+                            sx={{ 
+                              color: '#ef4444', // Rojo similar a text-red-600 de Tailwind
+                              fontSize: '1rem'  // Tamaño pequeño, ajustar si es necesario
+                            }}
+                          />
+                        )}
+                        <button
+                          onClick={() => abrirModalDetalles(item.idcalificacion)}
+                          className="inline-flex items-center justify-center p-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200"
+                          aria-label="Ver detalles"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      </Box>
                     </td>
                   </tr>
                 )))}
@@ -1318,6 +1477,84 @@ export default function RegistroCalificaciones() {
           )}
         </div>
       </div>
-    </div>
+    </Container>
   );
 } 
+
+// Nueva función auxiliar para generar datos de series diarias para los minigráficos
+const generateDailySeriesData = (
+  encuestas: EnvioEncuesta[],
+  type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas',
+  numPoints: number = 10 // Aseguramos que el default sea el que tienes (10)
+): number[] => {
+  if (!encuestas || encuestas.length === 0) {
+    return Array(numPoints).fill(0);
+  }
+
+  const dailyCounts: { [dateKey: string]: number } = {};
+
+  encuestas.forEach(encuesta => {
+    if (!encuesta.timestamp) return;
+
+    let matchesCriteria = false;
+    switch (type) {
+      case 'Total': matchesCriteria = true; break;
+      case 'Bueno': matchesCriteria = encuesta.calificacion === 'Bueno'; break;
+      case 'Malo': matchesCriteria = encuesta.calificacion === 'Malo'; break;
+      case 'Regular': matchesCriteria = encuesta.calificacion === 'Regular'; break;
+      case 'Calificadas': matchesCriteria = !!(encuesta.calificacion && encuesta.calificacion.trim() !== ''); break;
+      case 'Confirmadas': matchesCriteria = !!(encuesta.conformidad && encuesta.conformidad.trim() !== '' && encuesta.conformidad !== 'Pendiente'); break;
+    }
+
+    if (matchesCriteria) {
+      const dateKey = new Date(encuesta.timestamp).toISOString().split('T')[0];
+      dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
+    }
+  });
+
+  const sortedDateKeys = Object.keys(dailyCounts).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  
+  const series = sortedDateKeys.map(key => dailyCounts[key]); // Usar 'key' o 'dateKey' como parámetro del map
+
+  if (series.length >= numPoints) {
+    return series.slice(-numPoints);
+  } else if (series.length > 0) {
+    return Array(numPoints - series.length).fill(0).concat(series);
+  }
+  
+  return Array(numPoints).fill(0);
+};
+
+// Nueva función auxiliar para calcular tendencia desde una serie de datos
+const calculateTrendFromSeries = (seriesData: number[]): { direction?: 'up' | 'down'; percentage?: string } => {
+  if (!seriesData || seriesData.length < 2) {
+    return { direction: undefined, percentage: undefined };
+  }
+
+  const firstPoint = seriesData[0];
+  const lastPoint = seriesData[seriesData.length - 1];
+
+  let trendDirection: 'up' | 'down' | undefined = undefined;
+  if (lastPoint > firstPoint) {
+    trendDirection = 'up';
+  } else if (lastPoint < firstPoint) {
+    trendDirection = 'down';
+  }
+
+  let trendPercentage: string | undefined = undefined;
+  if (firstPoint !== 0) {
+    const change = ((lastPoint - firstPoint) / firstPoint) * 100;
+    trendPercentage = `${Math.abs(change).toFixed(1)}%`;
+  } else if (lastPoint > 0) {
+    trendPercentage = '∞%';
+  } else {
+    trendPercentage = '0.0%';
+  }
+  
+  if (firstPoint === lastPoint) {
+    trendPercentage = '0.0%';
+    trendDirection = undefined;
+  }
+
+  return { direction: trendDirection, percentage: trendPercentage };
+};
