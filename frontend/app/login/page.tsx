@@ -95,7 +95,7 @@ export default function Login() {
              style={{ backgroundImage: "url('/people.webp')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div className="absolute inset-0 bg-black opacity-40 rounded-l-xl z-0"></div>
           <div className="relative z-10">
-            <div className="logo mb-[94px]">
+            <div className="logo mb-[120px]">
               <Image 
                 src="/grupokossodo_blanco.png" 
                 alt="Logo Grupo Kossodo"
