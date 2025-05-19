@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS envio_de_encuestas (
     segmento VARCHAR(255),
     documento VARCHAR(255),
     tipo VARCHAR(50),
-    calificacion VARCHAR(50),
+    calificacion INT,
     observaciones TEXT,
     `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP,
     grupo VARCHAR(255),

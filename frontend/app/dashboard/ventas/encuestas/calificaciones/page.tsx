@@ -61,8 +61,10 @@ interface SummaryStatCardProps {
   title: string;
   value: string | number;
   seriesData: { name: string; color: string; data: number[] }[];
-  trendDirection?: 'up' | 'down';
-  trendPercentage?: string;
+  trendDirection?: 'up' | 'down';      // Para la flecha en la esquina sup. der.
+  variationPercentage?: string; // Para el % de variación en la esquina sup. der.
+  previousPeriodAbsoluteValue?: string | number; // NUEVA PROP: Valor absoluto del período anterior
+  valueSubtitle?: string;       // Para el % de totalidad debajo del valor principal
 }
 
 const defaultApexAreaOptions: any = {
@@ -80,8 +82,10 @@ const SummaryStatCard: React.FC<SummaryStatCardProps> = ({
   title,
   value,
   seriesData,
-  trendDirection,
-  trendPercentage,
+  trendDirection,       // Para la flecha
+  variationPercentage,  // Para el % de variación
+  previousPeriodAbsoluteValue, // NUEVA PROP
+  valueSubtitle,        // Para el subtítulo (porcentaje de totalidad)
 }) => {
   const TrendIcon = trendDirection === 'up' ? IconArrowUpLeft : IconArrowDownRight;
   const trendIconColor = trendDirection === 'up' ? '#39B69A' : '#FA896B';
@@ -93,7 +97,7 @@ const SummaryStatCard: React.FC<SummaryStatCardProps> = ({
   };
 
   return (
-    <Card variant="outlined" sx={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+    <Card variant="outlined" sx={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
       <CardContent sx={{ padding: '10px', paddingBottom: '2px !important' }}> 
         <Typography variant="caption" color="text.secondary" fontWeight={500} display="block" mb={0.15}> 
           {title}
@@ -101,19 +105,36 @@ const SummaryStatCard: React.FC<SummaryStatCardProps> = ({
         <Typography variant="h5" fontWeight={700} mb={0.15} lineHeight={1.2}> 
           {value}
         </Typography>
-        {trendDirection && trendPercentage && (
-          <Stack direction="row" spacing={0.5} alignItems="center" mb={0.25}>
+        {/* Subtítulo/Porcentaje de Totalidad (debajo del valor principal) */}
+        {valueSubtitle && (
+          <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.7rem' }} display="block" mb={0.25}> 
+            {valueSubtitle}
+          </Typography>
+        )}
+      </CardContent>
+
+      {/* Indicador de tendencia y variación (esquina superior derecha) */}
+      {trendDirection && variationPercentage && (
+        <Box sx={{ position: 'absolute', top: '10px', right: '10px', textAlign: 'right' }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
             <Avatar sx={{ bgcolor: trendDirection === 'up' ? 'success.light' : 'error.light', width: 18, height: 18 }}> 
               <TrendIcon width={12} color={trendIconColor} /> 
             </Avatar>
             <Typography variant="caption" fontWeight="600" sx={{ fontSize: '0.7rem' }}> 
-              {trendPercentage}
+              {variationPercentage}
             </Typography>
           </Stack>
-        )}
-      </CardContent>
+          {/* Valor absoluto del período anterior, debajo de la variación */}
+          {previousPeriodAbsoluteValue !== undefined && (
+            <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', display: 'block', lineHeight: 1.2 }}>
+              vs {previousPeriodAbsoluteValue} ant.
+            </Typography>
+          )}
+        </Box>
+      )}
+
       {seriesData && seriesData.length > 0 && seriesData[0].data.length > 0 && (
-         <Box sx={{ marginTop: trendDirection ? 0 : '4px', width: '100%' }}> 
+         <Box sx={{ marginTop: '4px', width: '100%' }}>
             <Chart options={chartOptions} series={seriesData} type="area" height="45px" width="100%" /> 
         </Box>
       )}
@@ -138,8 +159,8 @@ export default function RegistroCalificaciones() {
   // Estados para filtros (inicializarlos según sea necesario)
   const [filtroAsesor, setFiltroAsesor] = useState<string>('');
   const [filtroGrupo, setFiltroGrupo] = useState<string>('');
-  const [filtroCalificacion, setFiltroCalificacion] = useState<string>('');
-  const [filtroPeriodo, setFiltroPeriodo] = useState<string>('');
+  const [filtroCalificacion, setFiltroCalificacion] = useState<string>(''); // Mantener como string para "todos", "1-3", "4-6", "7-10"
+  const [filtroPeriodo, setFiltroPeriodo] = useState<string>('ultimos15dias'); // MODIFICADO: Filtro por defecto
   const [fechaInicioFiltro, setFechaInicioFiltro] = useState<string>('');
   const [fechaFinFiltro, setFechaFinFiltro] = useState<string>('');
   const [filtroDocumento, setFiltroDocumento] = useState<string>('');
@@ -163,14 +184,14 @@ export default function RegistroCalificaciones() {
 
   // Estados para el gráfico de pastel de Ventas
   const [ventasPieChartData, setVentasPieChartData] = useState<ChartDataState<PieChartDataset>>({
-    labels: ['Bueno', 'Regular', 'Malo'],
+    labels: ['7-10', '4-6', '1-3'], // ACTUALIZADO
     datasets: [],
   });
   const [ventasPieChartOptions, setVentasPieChartOptions] = useState({});
 
   // Estados para el gráfico de pastel de Coordinador
   const [coordinadorPieChartData, setCoordinadorPieChartData] = useState<ChartDataState<PieChartDataset>>({
-    labels: ['Bueno', 'Regular', 'Malo'],
+    labels: ['7-10', '4-6', '1-3'], // ACTUALIZADO
     datasets: [],
   });
   const [coordinadorPieChartOptions, setCoordinadorPieChartOptions] = useState({});
@@ -298,8 +319,31 @@ export default function RegistroCalificaciones() {
       if (filtroGrupo && (!encuesta.grupo || encuesta.grupo.toLowerCase() !== filtroGrupo.toLowerCase())) {
         return false;
       }
-      if (filtroCalificacion && (!encuesta.calificacion || encuesta.calificacion.toLowerCase() !== filtroCalificacion.toLowerCase())) {
-        return false;
+      // NUEVA LÓGICA PARA FILTRO DE CALIFICACIÓN NUMÉRICA
+      if (filtroCalificacion && filtroCalificacion !== 'todos') {
+        const calificacionNum = Number(encuesta.calificacion); // Asumir que encuesta.calificacion es o será un número
+        if (isNaN(calificacionNum)) return false; // Si no es un número válido, no incluir
+
+        switch (filtroCalificacion) {
+          case '1-3': // Malo
+            if (!(calificacionNum >= 1 && calificacionNum <= 3)) return false;
+            break;
+          case '4-6': // Regular
+            if (!(calificacionNum >= 4 && calificacionNum <= 6)) return false;
+            break;
+          case '7-10': // Bueno
+            if (!(calificacionNum >= 7 && calificacionNum <= 10)) return false;
+            break;
+          // Se podría añadir casos para números individuales si el select lo permite
+          default:
+            // Si filtroCalificacion es un número específico (ej. "7")
+            const filtroNum = Number(filtroCalificacion);
+            if (!isNaN(filtroNum)) {
+              if (calificacionNum !== filtroNum) return false;
+            } else {
+              return true; // Si el filtro no es un rango conocido ni un número, no filtrar por calificación
+            }
+        }
       }
       
       // Lógica de filtro por periodo (timestamp)
@@ -309,6 +353,13 @@ export default function RegistroCalificaciones() {
         let fechaFinRango: Date | null = null;
 
         switch (filtroPeriodo) {
+          case 'ultimos15dias':
+            const hoyPara15 = new Date();
+            const hace15Dias = new Date(hoyPara15);
+            hace15Dias.setDate(hoyPara15.getDate() - 14); // -14 para incluir hoy como uno de los 15 días
+            fechaInicioRango = getStartOfDay(hace15Dias);
+            fechaFinRango = getEndOfDay(hoyPara15);
+            break;
           case 'hoy':
             fechaInicioRango = getStartOfDay(hoy);
             fechaFinRango = getEndOfDay(hoy);
@@ -423,6 +474,13 @@ export default function RegistroCalificaciones() {
         let fechaFinRango: Date | null = null;
 
         switch (filtroPeriodo) {
+          case 'ultimos15dias':
+            const hoyPara15 = new Date();
+            const hace15Dias = new Date(hoyPara15);
+            hace15Dias.setDate(hoyPara15.getDate() - 14); // -14 para incluir hoy como uno de los 15 días
+            fechaInicioRango = getStartOfDay(hace15Dias);
+            fechaFinRango = getEndOfDay(hoyPara15);
+            break;
           case 'hoy':
             fechaInicioRango = getStartOfDay(hoy);
             fechaFinRango = getEndOfDay(hoy);
@@ -486,52 +544,117 @@ export default function RegistroCalificaciones() {
 
   // Datos para las tarjetas de resumen
   const summaryDataForCards = useMemo(() => {
-    const data = {
+    // Obtener el rango del período anterior
+    const { start: prevPeriodStart, end: prevPeriodEnd } = getPreviousPeriodRange(filtroPeriodo, fechaInicioFiltro, fechaFinFiltro);
+
+    let encuestasDelPeriodoAnterior: EnvioEncuesta[] = [];
+    if (prevPeriodStart && prevPeriodEnd) {
+      encuestasDelPeriodoAnterior = allEncuestas.filter(encuesta => 
+        encuesta.timestamp && isDateInRange(encuesta.timestamp, prevPeriodStart, prevPeriodEnd)
+      );
+    }
+
+    // Total de encuestas sin filtro de tiempo
+    const totalEncuestasSinFiltroTiempo = allEncuestas.length;
+
+    // Contadores para el período actual (usando encuestasParaKPIsYPasteles)
+    const currentData = {
       total: encuestasParaKPIsYPasteles.length,
-      bueno: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Bueno').length,
-      malo: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Malo').length,
-      regular: encuestasParaKPIsYPasteles.filter(e => e.calificacion === 'Regular').length,
-      calificadas: encuestasParaKPIsYPasteles.filter(e => e.calificacion && e.calificacion.trim() !== '').length,
-      confirmadas: encuestasParaKPIsYPasteles.filter(e => e.conformidad && e.conformidad.trim() !== '' && e.conformidad !== 'Pendiente').length, // Ajustado para no contar pendientes
+      bueno: encuestasParaKPIsYPasteles.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 7 && calNum <= 10; }).length,
+      malo: encuestasParaKPIsYPasteles.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 1 && calNum <= 3; }).length,
+      regular: encuestasParaKPIsYPasteles.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 4 && calNum <= 6; }).length,
+      calificadas: encuestasParaKPIsYPasteles.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && e.calificacion !== null && e.calificacion !== undefined && String(e.calificacion).trim() !== ''; }).length,
+      confirmadas: encuestasParaKPIsYPasteles.filter(e => e.conformidad && e.conformidad.trim() !== '' && e.conformidad !== 'Pendiente').length,
     };
 
-    const cardTypes: Array<{
-      type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas';
-      title: string;
-      color: string;
-    }> = [
+    // Contadores para el período anterior
+    const previousData = {
+      total: encuestasDelPeriodoAnterior.length,
+      bueno: encuestasDelPeriodoAnterior.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 7 && calNum <= 10; }).length,
+      malo: encuestasDelPeriodoAnterior.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 1 && calNum <= 3; }).length,
+      regular: encuestasDelPeriodoAnterior.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 4 && calNum <= 6; }).length,
+      calificadas: encuestasDelPeriodoAnterior.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && e.calificacion !== null && e.calificacion !== undefined && String(e.calificacion).trim() !== ''; }).length,
+      confirmadas: encuestasDelPeriodoAnterior.filter(e => e.conformidad && e.conformidad.trim() !== '' && e.conformidad !== 'Pendiente').length,
+    };
+
+    const cardTypes: Array<{ type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas'; title: string; color: string; }> = [
       { type: 'Total', title: 'Encuestas Totales', color: '#5D87FF' },
-      { type: 'Bueno', title: 'Buenas', color: '#39B69A' },
-      { type: 'Malo', title: 'Malas', color: '#FA896B' },
-      { type: 'Regular', title: 'Regulares', color: '#FFAE1F' },
+      { type: 'Bueno', title: 'Calf. (7-10)', color: '#39B69A' },
+      { type: 'Regular', title: 'Calf. (4-6)', color: '#FFAE1F' },
+      { type: 'Malo', title: 'Calf. (1-3)', color: '#FA896B' },
       { type: 'Calificadas', title: 'Calificadas', color: '#7460EE' },
       { type: 'Confirmadas', title: 'Confirmadas', color: '#6A1B9A' },
     ];
-    const miniChartDataPoints = 10; //
-    //  Define el número de puntos para los minigráficos
-    return cardTypes.map(cardConfig => {
-      const series = generateDailySeriesData(encuestasParaKPIsYPasteles, cardConfig.type, miniChartDataPoints);
 
-      const trend = calculateTrendFromSeries(series);
-      let currentValue = 0;
-      switch (cardConfig.type) {
-          case 'Total': currentValue = data.total; break;
-          case 'Bueno': currentValue = data.bueno; break;
-          case 'Malo': currentValue = data.malo; break;
-          case 'Regular': currentValue = data.regular; break;
-          case 'Calificadas': currentValue = data.calificadas; break;
-          case 'Confirmadas': currentValue = data.confirmadas; break;
+    const miniChartDataPoints = 10;
+    let valorActualEncuestasTotales = 0; // Para calcular porcentajes de otras tarjetas
+
+    const results = cardTypes.map(cardConfig => {
+      const currentValue = currentData[cardConfig.type.toLowerCase() as keyof typeof currentData];
+      const previousValue = previousData[cardConfig.type.toLowerCase() as keyof typeof previousData];
+      
+      if (cardConfig.type === 'Total') {
+        valorActualEncuestasTotales = currentValue;
+      }
+
+      let trendDirection: 'up' | 'down' | undefined = undefined;
+      let percentageVariationString = '-';
+
+      if (previousValue > 0) {
+        const variation = ((currentValue - previousValue) / previousValue) * 100;
+        percentageVariationString = variation.toFixed(1) + '%';
+        if (variation > 0) trendDirection = 'up';
+        else if (variation < 0) trendDirection = 'down';
+      } else if (currentValue > 0) { // Si antes era 0 y ahora no, es un aumento infinito (o grande)
+        percentageVariationString = '∞%'; // O podría ser 'N/A' o 100% si se prefiere
+        trendDirection = 'up';
+      } else {
+        // Si ambos son 0, o previous es 0 y current es 0, no hay cambio o no se puede calcular.
+        percentageVariationString = '0.0%';
+      }
+      if (currentValue === previousValue) { // Asegurar que si son iguales, no haya tendencia y sea 0%
+          trendDirection = undefined;
+          percentageVariationString = '0.0%';
+      }
+
+      // La serie para el minigráfico sigue siendo del período actual
+      const seriesForMiniChart = generateDailySeriesData(encuestasParaKPIsYPasteles, cardConfig.type, miniChartDataPoints);
+      // const trendForMiniChart = calculateTrendFromSeries(seriesForMiniChart); // Ya no usamos esta tendencia para el ícono principal
+
+      let valueSubtitleString = '';
+      if (cardConfig.type === 'Total') {
+        if (totalEncuestasSinFiltroTiempo > 0) {
+          valueSubtitleString = `${((currentValue / totalEncuestasSinFiltroTiempo) * 100).toFixed(1)}% del total`;
+        } else {
+          valueSubtitleString = '0.0% del total';
+        }
+      } else {
+        if (valorActualEncuestasTotales > 0) {
+          valueSubtitleString = `${((currentValue / valorActualEncuestasTotales) * 100).toFixed(1)}% de totales`;
+        } else {
+          valueSubtitleString = '0.0% de totales';
+        }
       }
 
       return {
         title: cardConfig.title,
         value: currentValue,
-        series: [{ name: cardConfig.title, data: series, color: cardConfig.color }],
-        trendDirection: trend.direction,
-        trendPercentage: trend.percentage,
+        series: [{ name: cardConfig.title, data: seriesForMiniChart, color: cardConfig.color }],
+        trendDirection: trendDirection, 
+        variationPercentage: percentageVariationString, 
+        previousPeriodAbsoluteValue: previousValue, // Pasar el valor absoluto del período anterior
+        valueSubtitle: valueSubtitleString, // Usar el nuevo subtítulo calculado
       };
     });
-  }, [encuestasParaKPIsYPasteles]);
+
+    // Asegurarse de que valorActualEncuestasTotales se calcula primero o que el map se hace en dos pasadas si es necesario.
+    // Para este caso, la dependencia es hacia adelante, así que un solo map debería funcionar si 'Total' es el primer elemento.
+    // Si el orden de cardTypes cambia, esto podría necesitar un ajuste (ej. calcular 'Total' primero fuera del map).
+    // Confirmando que 'Total' es el primer elemento en cardTypes, el enfoque actual es correcto.
+
+    return results;
+
+  }, [encuestasParaKPIsYPasteles, allEncuestas, filtroPeriodo, fechaInicioFiltro, fechaFinFiltro]); // Dependencias actualizadas
 
   // Top 7 Asesores por cantidad de calificaciones "Bueno"
   const topAsesoresPorBuenas = useMemo(() => {
@@ -544,7 +667,8 @@ export default function RegistroCalificaciones() {
         if (!conteoPorAsesor[encuesta.asesor]) {
           conteoPorAsesor[encuesta.asesor] = { buenas: 0, nombre: encuesta.asesor };
         }
-        if (encuesta.calificacion === 'Bueno') {
+        const calNum = Number(encuesta.calificacion);
+        if (!isNaN(calNum) && calNum >= 7 && calNum <= 10) { // Rango 7-10
           conteoPorAsesor[encuesta.asesor].buenas++;
         }
       }
@@ -562,17 +686,19 @@ export default function RegistroCalificaciones() {
     const percepcionPorAsesor: { [asesor: string]: { nombre: string, totalPuntos: number, maxPuntos: number, percepcion: number, calificadas: number } } = {};
 
     encuestasParaKPIsYPasteles.forEach(encuesta => {
-      if (encuesta.asesor && encuesta.calificacion) { // Asegurar que haya calificacion para contarla
+      const calNum = Number(encuesta.calificacion);
+      if (encuesta.asesor && !isNaN(calNum)) { 
         if (!percepcionPorAsesor[encuesta.asesor]) {
           percepcionPorAsesor[encuesta.asesor] = { nombre: encuesta.asesor, totalPuntos: 0, maxPuntos: 0, percepcion: 0, calificadas: 0 };
         }
 
         let puntos = 0;
-        if (encuesta.calificacion === 'Bueno') puntos = 2;
-        else if (encuesta.calificacion === 'Regular') puntos = 1;
+        if (calNum >= 7 && calNum <= 10) puntos = 3; // Bueno
+        else if (calNum >= 4 && calNum <= 6) puntos = 2; // Regular
+        else if (calNum >= 1 && calNum <= 3) puntos = 1; // Malo
 
         percepcionPorAsesor[encuesta.asesor].totalPuntos += puntos;
-        percepcionPorAsesor[encuesta.asesor].maxPuntos += 2; 
+        percepcionPorAsesor[encuesta.asesor].maxPuntos += 3; // Max 3 puntos por encuesta calificada numéricamente
         percepcionPorAsesor[encuesta.asesor].calificadas += 1;
       }
     });
@@ -606,14 +732,15 @@ export default function RegistroCalificaciones() {
     return Array.from(grupos).sort();
   }, [allEncuestas]);
 
-  const calificacionesUnicas = useMemo(() => {
-    const calificaciones = new Set(
-      allEncuestas
-        .map(e => e.calificacion)
-        .filter((calif): calif is string => typeof calif === 'string') // Asegurar que solo sean strings
-    );
-    return Array.from(calificaciones).sort();
-  }, [allEncuestas]);
+  // REEMPLAZAR calificacionesUnicas con opciones fijas para la nueva escala
+  const opcionesFiltroCalificacion = [
+    { value: 'todos', label: 'Todas las calificaciones' },
+    { value: '7-10', label: 'Bueno (7-10)' },
+    { value: '4-6', label: 'Regular (4-6)' },
+    { value: '1-3', label: 'Malo (1-3)' },
+    // Podríamos añadir opciones para cada número si se desea una granularidad mayor
+    // { value: '10', label: '10' }, { value: '9', label: '9' }, ...
+  ];
 
   // Efecto para procesar datos para el gráfico cuando las encuestas filtradas cambien
   useEffect(() => {
@@ -623,17 +750,18 @@ export default function RegistroCalificaciones() {
     // ESTE GRÁFICO DEBE USAR encuestasParaKPIsYPasteles para NO ser afectado por filtroDocumento
     if (!loading && encuestasParaKPIsYPasteles.length > 0) {
       const procesarDatosParaGraficoLineas = () => {
-        const agrupadoPorFecha: { [fecha: string]: { Malo: number, Regular: number, Bueno: number } } = {};
+        const agrupadoPorFecha: { [fecha: string]: { '1-3': number, '4-6': number, '7-10': number } } = {};
 
-        encuestasParaKPIsYPasteles.forEach(encuesta => { // <-- CAMBIO AQUÍ: usar encuestasParaKPIsYPasteles
-          if (encuesta.timestamp && encuesta.calificacion) {
+        encuestasParaKPIsYPasteles.forEach(encuesta => { 
+          const calNum = Number(encuesta.calificacion);
+          if (encuesta.timestamp && !isNaN(calNum)) {
             const fecha = new Date(encuesta.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
             if (!agrupadoPorFecha[fecha]) {
-              agrupadoPorFecha[fecha] = { Malo: 0, Regular: 0, Bueno: 0 };
+              agrupadoPorFecha[fecha] = { '1-3': 0, '4-6': 0, '7-10': 0 };
             }
-            if (encuesta.calificacion === 'Malo') agrupadoPorFecha[fecha].Malo++;
-            else if (encuesta.calificacion === 'Regular') agrupadoPorFecha[fecha].Regular++;
-            else if (encuesta.calificacion === 'Bueno') agrupadoPorFecha[fecha].Bueno++;
+            if (calNum >= 1 && calNum <= 3) agrupadoPorFecha[fecha]['1-3']++;
+            else if (calNum >= 4 && calNum <= 6) agrupadoPorFecha[fecha]['4-6']++;
+            else if (calNum >= 7 && calNum <= 10) agrupadoPorFecha[fecha]['7-10']++;
           }
         });
 
@@ -647,22 +775,22 @@ export default function RegistroCalificaciones() {
           labels: labelsOrdenados,
           datasets: [
             {
-              label: 'Malo',
-              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha].Malo),
+              label: 'Calf. (1-3)', // Malo
+              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha]['1-3']),
               borderColor: 'rgba(255, 99, 132, 1)',
               backgroundColor: 'rgba(255, 99, 132, 0.2)',
               tension: 0.1,
             },
             {
-              label: 'Regular',
-              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha].Regular),
+              label: 'Calf. (4-6)', // Regular
+              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha]['4-6']),
               borderColor: 'rgba(255, 206, 86, 1)',
               backgroundColor: 'rgba(255, 206, 86, 0.2)',
               tension: 0.1,
             },
             {
-              label: 'Bueno',
-              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha].Bueno),
+              label: 'Calf. (7-10)', // Bueno
+              data: labelsOrdenados.map(fecha => agrupadoPorFecha[fecha]['7-10']),
               borderColor: 'rgba(75, 192, 192, 1)',
               backgroundColor: 'rgba(75, 192, 192, 0.2)',
               tension: 0.1,
@@ -714,20 +842,20 @@ export default function RegistroCalificaciones() {
       );
 
       if (encuestasVentas.length > 0) {
-        const buenoCount = encuestasVentas.filter((e: EnvioEncuesta) => e.calificacion === 'Bueno').length;
-        const regularCount = encuestasVentas.filter((e: EnvioEncuesta) => e.calificacion === 'Regular').length;
-        const maloCount = encuestasVentas.filter((e: EnvioEncuesta) => e.calificacion === 'Malo').length;
+        const count1_3 = encuestasVentas.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 1 && calNum <= 3; }).length;
+        const count4_6 = encuestasVentas.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 4 && calNum <= 6; }).length;
+        const count7_10 = encuestasVentas.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 7 && calNum <= 10; }).length;
 
         setVentasPieChartData({
-          labels: ['Bueno', 'Regular', 'Malo'],
+          labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'],
           datasets: [
             {
               label: 'Calificaciones Ventas',
-              data: [buenoCount, regularCount, maloCount],
+              data: [count7_10, count4_6, count1_3],
               backgroundColor: [
-                'rgba(75, 192, 192, 0.7)', // Bueno
-                'rgba(255, 206, 86, 0.7)', // Regular
-                'rgba(255, 99, 132, 0.7)',  // Malo
+                'rgba(75, 192, 192, 0.7)', // 7-10 (Bueno)
+                'rgba(255, 206, 86, 0.7)', // 4-6 (Regular)
+                'rgba(255, 99, 132, 0.7)',  // 1-3 (Malo)
               ],
               borderColor: [
                 'rgba(75, 192, 192, 1)',
@@ -735,7 +863,7 @@ export default function RegistroCalificaciones() {
                 'rgba(255, 99, 132, 1)',
               ],
               borderWidth: 1,
-            } as PieChartDataset, // Tipado correcto
+            } as PieChartDataset, 
           ],
         });
         setVentasPieChartOptions({
@@ -767,7 +895,7 @@ export default function RegistroCalificaciones() {
           },
         });
       } else {
-        setVentasPieChartData({ labels: ['Bueno', 'Regular', 'Malo'], datasets: [] });
+        setVentasPieChartData({ labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'], datasets: [] });
       }
 
       // Procesar datos para el gráfico de pastel de COORDINADOR
@@ -776,16 +904,16 @@ export default function RegistroCalificaciones() {
       );
 
       if (encuestasCoordinador.length > 0) {
-        const buenoCountCoord = encuestasCoordinador.filter((e: EnvioEncuesta) => e.calificacion === 'Bueno').length;
-        const regularCountCoord = encuestasCoordinador.filter((e: EnvioEncuesta) => e.calificacion === 'Regular').length;
-        const maloCountCoord = encuestasCoordinador.filter((e: EnvioEncuesta) => e.calificacion === 'Malo').length;
+        const count1_3_coord = encuestasCoordinador.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 1 && calNum <= 3; }).length;
+        const count4_6_coord = encuestasCoordinador.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 4 && calNum <= 6; }).length;
+        const count7_10_coord = encuestasCoordinador.filter(e => { const calNum = Number(e.calificacion); return !isNaN(calNum) && calNum >= 7 && calNum <= 10; }).length;
 
         setCoordinadorPieChartData({
-          labels: ['Bueno', 'Regular', 'Malo'],
+          labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'],
           datasets: [
             {
               label: 'Calificaciones Coordinador',
-              data: [buenoCountCoord, regularCountCoord, maloCountCoord],
+              data: [count7_10_coord, count4_6_coord, count1_3_coord],
               backgroundColor: [
                 'rgba(75, 192, 192, 0.7)',
                 'rgba(255, 206, 86, 0.7)',
@@ -797,7 +925,7 @@ export default function RegistroCalificaciones() {
                 'rgba(255, 99, 132, 1)',
               ],
               borderWidth: 1,
-            } as PieChartDataset, // Tipado correcto
+            } as PieChartDataset, 
           ],
         });
         setCoordinadorPieChartOptions({
@@ -829,12 +957,12 @@ export default function RegistroCalificaciones() {
           },
         });
       } else {
-        setCoordinadorPieChartData({ labels: ['Bueno', 'Regular', 'Malo'], datasets: [] });
+        setCoordinadorPieChartData({ labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'], datasets: [] });
       }
     } else if (!loading) {
-        setVentasPieChartData({ labels: ['Bueno', 'Regular', 'Malo'], datasets: [] });
-        setCoordinadorPieChartData({ labels: ['Bueno', 'Regular', 'Malo'], datasets: [] });
-        setPercepcionGrupoBarChartData({ labels: [], datasets: [] }); // Limpiar también este gráfico
+        setVentasPieChartData({ labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'], datasets: [] });
+        setCoordinadorPieChartData({ labels: ['7-10 (Bueno)', '4-6 (Regular)', '1-3 (Malo)'], datasets: [] });
+        setPercepcionGrupoBarChartData({ labels: [], datasets: [] }); 
     }
 
     // Procesar datos para el gráfico de barras de PERCEPCIÓN POR GRUPO
@@ -842,18 +970,19 @@ export default function RegistroCalificaciones() {
       const percepcionPorGrupo: { [grupo: string]: { totalPuntos: number; maxPuntos: number, count: number } } = {};
 
       encuestasParaKPIsYPasteles.forEach((encuesta: EnvioEncuesta) => {
-        if (encuesta.grupo && encuesta.calificacion) { // Asegurarse que hay grupo y calificación
+        const calNum = Number(encuesta.calificacion);
+        if (encuesta.grupo && !isNaN(calNum)) { 
           if (!percepcionPorGrupo[encuesta.grupo]) {
             percepcionPorGrupo[encuesta.grupo] = { totalPuntos: 0, maxPuntos: 0, count: 0 };
           }
 
           let puntos = 0;
-          if (encuesta.calificacion === 'Bueno') puntos = 2;
-          else if (encuesta.calificacion === 'Regular') puntos = 1;
-          // Malo obtiene 0 puntos, no es necesario sumar
+          if (calNum >= 7 && calNum <= 10) puntos = 3;       // Bueno: 3 puntos
+          else if (calNum >= 4 && calNum <= 6) puntos = 2;  // Regular: 2 puntos
+          else if (calNum >= 1 && calNum <= 3) puntos = 1;  // Malo: 1 punto
 
           percepcionPorGrupo[encuesta.grupo].totalPuntos += puntos;
-          percepcionPorGrupo[encuesta.grupo].maxPuntos += 2; // Máximo 2 puntos por encuesta calificada
+          percepcionPorGrupo[encuesta.grupo].maxPuntos += 3; // Máximo 3 puntos por encuesta
           percepcionPorGrupo[encuesta.grupo].count += 1;
         }
       });
@@ -921,7 +1050,7 @@ export default function RegistroCalificaciones() {
       setPercepcionGrupoBarChartData({ labels: [], datasets: [] });
     }
 
-  }, [loading, encuestasParaKPIsYPasteles]); // <-- Dependencia principal para este efecto ahora es encuestasParaKPIsYPasteles y loading
+  }, [loading, encuestasParaKPIsYPasteles, setChartData, setChartOptions, setVentasPieChartData, setVentasPieChartOptions, setCoordinadorPieChartData, setCoordinadorPieChartOptions, setPercepcionGrupoBarChartData, setPercepcionGrupoBarChartOptions]); // Añadidas todas las funciones de estado de los gráficos como dependencias
 
   // Efecto para debounce del filtro de documento
   useEffect(() => {
@@ -932,7 +1061,7 @@ export default function RegistroCalificaciones() {
     return () => {
       clearTimeout(timerId);
     };
-  }, [valorInputDocumento]);
+  }, [valorInputDocumento, setFiltroDocumento]); // Añadido setFiltroDocumento como dependencia
 
   if (loading && !allEncuestas.length) {
     return (
@@ -1017,8 +1146,17 @@ export default function RegistroCalificaciones() {
                   <p><strong className="font-medium text-gray-600">Documento:</strong> {detalleSeleccionado.documento || 'N/A'}</p>
                   <p><strong className="font-medium text-gray-600">Tipo Encuesta:</strong> {detalleSeleccionado.tipo || 'N/A'}</p>
                   <p><strong className="font-medium text-gray-600">Calificación:</strong> 
-                    <span className={`font-semibold ml-1 ${detalleSeleccionado.calificacion === 'Bueno' ? 'text-green-600' : detalleSeleccionado.calificacion === 'Regular' ? 'text-yellow-600' : detalleSeleccionado.calificacion === 'Malo' ? 'text-red-600' : 'text-gray-600'}`}>
-                      {detalleSeleccionado.calificacion || 'N/D'}
+                    <span className={`font-semibold ml-1 ${
+                      (() => {
+                        const calNum = Number(detalleSeleccionado.calificacion);
+                        if (isNaN(calNum)) return 'text-gray-600';
+                        if (calNum >= 7 && calNum <= 10) return 'text-green-600';
+                        if (calNum >= 4 && calNum <= 6) return 'text-yellow-600';
+                        if (calNum >= 1 && calNum <= 3) return 'text-red-600';
+                        return 'text-gray-600';
+                      })()
+                    }`}>
+                      {detalleSeleccionado.calificacion ? Number(detalleSeleccionado.calificacion).toString() : 'N/D'}
                     </span>
                   </p>
                   <p><strong className="font-medium text-gray-600">Grupo:</strong> {detalleSeleccionado.grupo || 'N/A'}</p>
@@ -1133,10 +1271,9 @@ export default function RegistroCalificaciones() {
         mb={4}
       >
         {summaryDataForCards.map((cardData, index) => (
-          // @ts-ignore // Temporalmente ignoramos el error de linter del Grid mientras se investiga.
+          // @ts-ignore 
           <Grid
             item
-            component="div" // Necesario para que sx funcione correctamente con flexBasis/maxWidth en algunas versiones/contextos
             key={index}
             xs={12}  // 1 tarjeta por fila en extra-small
             sm={6}   // 2 tarjetas por fila en small (50%)
@@ -1157,7 +1294,9 @@ export default function RegistroCalificaciones() {
               value={cardData.value} 
               seriesData={cardData.series}
               trendDirection={cardData.trendDirection as 'up' | 'down' | undefined}
-              trendPercentage={cardData.trendPercentage}
+              variationPercentage={cardData.variationPercentage}
+              previousPeriodAbsoluteValue={cardData.previousPeriodAbsoluteValue} // Usar la nueva prop
+              valueSubtitle={cardData.valueSubtitle}
             />
           </Grid>
         ))}
@@ -1193,9 +1332,8 @@ export default function RegistroCalificaciones() {
             value={filtroCalificacion}
             onChange={(e) => setFiltroCalificacion(e.target.value)}
           >
-            <option value="">Todas las calificaciones</option>
-            {calificacionesUnicas.map(calificacion => (
-              <option key={calificacion} value={calificacion}>{calificacion}</option>
+            {opcionesFiltroCalificacion.map(opcion => (
+              <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
             ))}
           </select>
           
@@ -1203,8 +1341,10 @@ export default function RegistroCalificaciones() {
             <select 
               className="w-full p-2 border border-gray-300 rounded-md bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#d48b45]"
               onChange={manejarCambioFiltroFechas}
+              value={filtroPeriodo} // Asegurarse que el valor del select está controlado
             >
               <option value="">Todos los periodos</option>
+              <option value="ultimos15dias">Últimos 15 días</option> {/* AÑADIDO */}
               <option value="hoy">Hoy</option>
               <option value="ayer">Ayer</option>
               <option value="semana">Esta semana</option>
@@ -1415,15 +1555,16 @@ export default function RegistroCalificaciones() {
                     <td className="px-3 py-2 text-gray-800">{item.nombres || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`inline-flex px-2 text-xs rounded-full ${
-                        item.calificacion === 'Bueno'
-                          ? 'bg-green-100 text-green-800'
-                          : item.calificacion === 'Regular'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : item.calificacion === 'Malo'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
+                        (() => {
+                          const calNum = Number(item.calificacion);
+                          if (isNaN(calNum)) return 'bg-gray-100 text-gray-800';
+                          if (calNum >= 7 && calNum <= 10) return 'bg-green-100 text-green-800';
+                          if (calNum >= 4 && calNum <= 6) return 'bg-yellow-100 text-yellow-800';
+                          if (calNum >= 1 && calNum <= 3) return 'bg-red-100 text-red-800';
+                          return 'bg-gray-100 text-gray-800';
+                        })()
                       }`}>
-                        {item.calificacion || 'N/D'}
+                        {item.calificacion ? Number(item.calificacion).toString() : 'N/D'}
                       </span>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-800">{item.tipo || 'N/A'}</td>
@@ -1484,8 +1625,8 @@ export default function RegistroCalificaciones() {
 // Nueva función auxiliar para generar datos de series diarias para los minigráficos
 const generateDailySeriesData = (
   encuestas: EnvioEncuesta[],
-  type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas',
-  numPoints: number = 10 // Aseguramos que el default sea el que tienes (10)
+  type: 'Total' | 'Bueno' | 'Malo' | 'Regular' | 'Calificadas' | 'Confirmadas', // Tipos existentes, la lógica interna se adapta
+  numPoints: number = 10 
 ): number[] => {
   if (!encuestas || encuestas.length === 0) {
     return Array(numPoints).fill(0);
@@ -1497,13 +1638,25 @@ const generateDailySeriesData = (
     if (!encuesta.timestamp) return;
 
     let matchesCriteria = false;
+    const calNum = Number(encuesta.calificacion); // Convertir a número aquí
+
     switch (type) {
       case 'Total': matchesCriteria = true; break;
-      case 'Bueno': matchesCriteria = encuesta.calificacion === 'Bueno'; break;
-      case 'Malo': matchesCriteria = encuesta.calificacion === 'Malo'; break;
-      case 'Regular': matchesCriteria = encuesta.calificacion === 'Regular'; break;
-      case 'Calificadas': matchesCriteria = !!(encuesta.calificacion && encuesta.calificacion.trim() !== ''); break;
-      case 'Confirmadas': matchesCriteria = !!(encuesta.conformidad && encuesta.conformidad.trim() !== '' && encuesta.conformidad !== 'Pendiente'); break;
+      case 'Bueno': // Corresponde a 7-10
+        matchesCriteria = !isNaN(calNum) && calNum >= 7 && calNum <= 10;
+        break;
+      case 'Malo': // Corresponde a 1-3
+        matchesCriteria = !isNaN(calNum) && calNum >= 1 && calNum <= 3;
+        break;
+      case 'Regular': // Corresponde a 4-6
+        matchesCriteria = !isNaN(calNum) && calNum >= 4 && calNum <= 6;
+        break;
+      case 'Calificadas': 
+        matchesCriteria = !isNaN(calNum) && encuesta.calificacion !== null && encuesta.calificacion !== undefined && String(encuesta.calificacion).trim() !== '';
+        break;
+      case 'Confirmadas': 
+        matchesCriteria = !!(encuesta.conformidad && encuesta.conformidad.trim() !== '' && encuesta.conformidad !== 'Pendiente'); 
+        break;
     }
 
     if (matchesCriteria) {
@@ -1557,4 +1710,133 @@ const calculateTrendFromSeries = (seriesData: number[]): { direction?: 'up' | 'd
   }
 
   return { direction: trendDirection, percentage: trendPercentage };
+};
+
+// CORREGIDA: Nueva función para obtener el rango del período anterior
+const getPreviousPeriodRange = (
+  currentPeriod: string,
+  currentStartDateFromFilter?: string,
+  currentEndDateFromFilter?: string
+): { start?: Date; end?: Date } => {
+  const hoy = new Date();
+  let startCurrent: Date;
+  let endCurrent: Date;
+
+  // 1. Determinar las fechas de inicio y fin del PERÍODO ACTUAL
+  switch (currentPeriod) {
+    case 'ultimos15dias':
+      endCurrent = getEndOfDay(hoy);
+      startCurrent = getStartOfDay(new Date(new Date().setDate(hoy.getDate() - 14)));
+      break;
+    case 'hoy':
+      startCurrent = getStartOfDay(hoy);
+      endCurrent = getEndOfDay(hoy);
+      break;
+    case 'ayer':
+      const ayer = new Date(new Date().setDate(hoy.getDate() - 1));
+      startCurrent = getStartOfDay(ayer);
+      endCurrent = getEndOfDay(ayer);
+      break;
+    case 'semana':
+      startCurrent = getStartOfWeek(hoy);
+      endCurrent = getEndOfWeek(hoy);
+      break;
+    case 'mes':
+      startCurrent = getStartOfMonth(hoy);
+      endCurrent = getEndOfMonth(hoy);
+      break;
+    case 'mes-1': // Último mes completo
+      const firstDayThisMonthForMes1 = getStartOfMonth(hoy);
+      endCurrent = getEndOfDay(new Date(new Date(firstDayThisMonthForMes1).setDate(0))); // Fin del mes pasado
+      startCurrent = getStartOfMonth(endCurrent); // Inicio del mes pasado
+      break;
+    case 'mes-3': // Últimos 3 meses completos, terminando el mes pasado
+      const firstDayThisMonthForMes3 = getStartOfMonth(hoy);
+      const lastDayLastMonthForMes3 = getEndOfDay(new Date(new Date(firstDayThisMonthForMes3).setDate(0)));
+      endCurrent = lastDayLastMonthForMes3;
+      startCurrent = getStartOfMonth(new Date(lastDayLastMonthForMes3.getFullYear(), lastDayLastMonthForMes3.getMonth() - 2, 1));
+      break;
+    case 'mes-6': // Últimos 6 meses completos, terminando el mes pasado
+      const firstDayThisMonthForMes6 = getStartOfMonth(hoy);
+      const lastDayLastMonthForMes6 = getEndOfDay(new Date(new Date(firstDayThisMonthForMes6).setDate(0)));
+      endCurrent = lastDayLastMonthForMes6;
+      startCurrent = getStartOfMonth(new Date(lastDayLastMonthForMes6.getFullYear(), lastDayLastMonthForMes6.getMonth() - 5, 1));
+      break;
+    case 'año': // Año actual en curso
+      startCurrent = getStartOfDay(new Date(hoy.getFullYear(), 0, 1));
+      endCurrent = getEndOfDay(new Date(hoy.getFullYear(), 11, 31));
+      break;
+    case 'personalizado':
+      if (!currentStartDateFromFilter || !currentEndDateFromFilter) {
+        // console.warn("Rango personalizado actual incompleto para getPreviousPeriodRange.");
+        return {}; // Necesita ambas fechas para el periodo actual
+      }
+      const parsedStart = new Date(currentStartDateFromFilter);
+      const parsedEnd = new Date(currentEndDateFromFilter);
+      if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+        // console.warn("Fechas personalizadas actuales inválidas para getPreviousPeriodRange.");
+        return {};
+      }
+      startCurrent = getStartOfDay(parsedStart);
+      endCurrent = getEndOfDay(parsedEnd);
+      break;
+    default:
+      // Si currentPeriod es "" (Todos los periodos) o desconocido, no podemos calcular el anterior.
+      // console.warn(\`Período actual desconocido o no aplicable para getPreviousPeriodRange: \'\${currentPeriod}\'\`);
+      return {};
+  }
+
+  // Si llegamos aquí, startCurrent y endCurrent DEBEN estar definidos y ser válidos.
+
+  // 2. Calcular las fechas de inicio y fin del PERÍODO ANTERIOR
+  let startPrevious: Date;
+  let endPrevious: Date;
+
+  // Calcular la duración en días del período actual.
+  // Se suma 1 porque, por ejemplo, de Lunes 00:00 a Lunes 23:59 es 1 día.
+  // getTime() da milisegundos. (end - start) / ms_por_dia.
+  const durationMs = endCurrent.getTime() - startCurrent.getTime();
+  const durationDays = Math.round(durationMs / (1000 * 60 * 60 * 24)) + 1;
+
+
+  if (currentPeriod === 'mes' || currentPeriod === 'mes-1') {
+    const firstDayOfCurrentReferencedMonth = startCurrent;
+    endPrevious = getEndOfDay(new Date(new Date(firstDayOfCurrentReferencedMonth).setDate(0)));
+    startPrevious = getStartOfMonth(endPrevious);
+  } else if (currentPeriod === 'mes-3') {
+    endPrevious = getEndOfDay(new Date(new Date(startCurrent).setDate(0)));
+    startPrevious = getStartOfMonth(new Date(new Date(endPrevious).setMonth(endPrevious.getMonth() - 2)));
+  } else if (currentPeriod === 'mes-6') {
+    endPrevious = getEndOfDay(new Date(new Date(startCurrent).setDate(0)));
+    startPrevious = getStartOfMonth(new Date(new Date(endPrevious).setMonth(endPrevious.getMonth() - 5)));
+  } else if (currentPeriod === 'año') {
+    // Si el período actual es el año en curso, el anterior es el año pasado completo.
+    startPrevious = getStartOfDay(new Date(startCurrent.getFullYear() - 1, 0, 1));
+    endPrevious = getEndOfDay(new Date(startCurrent.getFullYear() - 1, 11, 31));
+  } else if ( // Estos son los casos que dependen de la duración exacta
+    currentPeriod === 'ultimos15dias' ||
+    currentPeriod === 'hoy' ||
+    currentPeriod === 'ayer' ||
+    currentPeriod === 'semana' ||
+    currentPeriod === 'personalizado'
+  ) {
+    // El período anterior termina el día antes de que comience el período actual.
+    endPrevious = getEndOfDay(new Date(new Date(startCurrent).setDate(startCurrent.getDate() - 1)));
+    // El período anterior comienza 'durationDays' antes (contando endPrevious).
+    startPrevious = getStartOfDay(new Date(new Date(endPrevious).setDate(endPrevious.getDate() - (durationDays - 1))));
+  } else {
+    // Esta rama teóricamente no debería alcanzarse si el switch de arriba es exhaustivo
+    // y todos los valores de currentPeriod válidos están cubiertos en los if/else if anteriores.
+    // Pero para satisfacer a TypeScript y como salvaguarda:
+    // console.error(\`Lógica para calcular período anterior no implementada para: \'\${currentPeriod}\'\`);
+    return {}; // Asegura que no se intente usar startPrevious/endPrevious sin asignar.
+  }
+
+  // Verificación final de que las fechas calculadas son válidas
+  if (startPrevious === undefined || endPrevious === undefined || isNaN(startPrevious.getTime()) || isNaN(endPrevious.getTime())) {
+    // console.error("Cálculo de período anterior resultó en fechas inválidas para:", currentPeriod, startPrevious, endPrevious);
+    return {};
+  }
+
+  return { start: startPrevious, end: endPrevious };
 };

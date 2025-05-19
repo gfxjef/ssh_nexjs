@@ -136,7 +136,7 @@ export default function AppSidebar() {
   return (
     <>
       <GlobalSidebarStyles />
-      <Sidebar width={"270px"} themeColor="#d3d3d3"  textColor="#828282">
+      <Sidebar width={"270px"} themeColor="#d3d3d3"  textColor="#828282" showProfile={false}>
         <Logo
           component={Link}
           href="/dashboard"

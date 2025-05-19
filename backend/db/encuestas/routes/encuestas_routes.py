@@ -60,12 +60,21 @@ def create_envio_encuesta():
     # Los campos que pueden ser NULL deben manejarse adecuadamente (ej. con data.get(campo, None))
     required_fields = ['asesor', 'nombres', 'ruc', 'correo', 'segmento', 'documento', 'tipo', 'calificacion', 'grupo', 'fecha_califacion', 'conformidad']
     for field in required_fields:
-        if field not in data:
-            return jsonify({'success': False, 'error': f'Campo requerido ausente: {field}'}), 400
+        if field not in data or data[field] is None: # Asegurar que no sea None si es requerido
+            return jsonify({'success': False, 'error': f'Campo requerido ausente o nulo: {field}'}), 400
     
+    # Validación para 'calificacion'
+    calificacion_val = data.get('calificacion')
+    try:
+        calificacion_num = int(calificacion_val)
+        if not (1 <= calificacion_num <= 10):
+            return jsonify({'success': False, 'error': 'La calificación debe ser un número entero entre 1 y 10'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'La calificación debe ser un número entero válido'}), 400
+
     params = (
         data.get('asesor'), data.get('nombres'), data.get('ruc'), data.get('correo'), 
-        data.get('segmento'), data.get('documento'), data.get('tipo'), data.get('calificacion'), 
+        data.get('segmento'), data.get('documento'), data.get('tipo'), calificacion_num, # Usar calificacion_num validada 
         data.get('observaciones'), data.get('grupo'), data.get('fecha_califacion'), 
         data.get('conformidad'), data.get('conformidad_obs'), data.get('conformidad_timestamp')
     )
@@ -103,8 +112,25 @@ def update_envio_encuesta(idcalificacion):
         
         current_envio = current_envio_rows[0] # Acceder al primer (y único) diccionario de la fila
 
+        # Validación para 'calificacion' si se está actualizando
+        calificacion_final = current_envio.get('calificacion') # Valor por defecto es el actual
+        if 'calificacion' in data and data['calificacion'] is not None:
+            try:
+                calificacion_num_update = int(data['calificacion'])
+                if not (1 <= calificacion_num_update <= 10):
+                    return jsonify({'success': False, 'error': 'La calificación debe ser un número entero entre 1 y 10'}), 400
+                calificacion_final = calificacion_num_update
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'La calificación debe ser un número entero válido'}), 400
+        elif 'calificacion' in data and data['calificacion'] is None: # Si se envía explícitamente null
+             # Aquí se podría decidir si permitir poner calificacion a NULL o si mantenerla con error
+             # Por ahora, si es un campo que no puede ser NULL en BD (ahora es INT, puede ser NULL), esto causaría error en BD si no se maneja.
+             # Si se quiere permitir NULL, calificacion_final = None. Sino, error o ignorar.
+             # Asumiendo que INT puede ser NULL en la BD según la definición de queries.py (solo `calificacion INT`)
+             calificacion_final = None
+
         # Preparar el timestamp de conformidad
-        conformidad_val = data.get('conformidad', current_envio.get('conformidad')) # Usar .get() para seguridad
+        conformidad_val = data.get('conformidad', current_envio.get('conformidad'))
         conformidad_obs_val = data.get('conformidad_obs', current_envio.get('conformidad_obs'))
         
         # Si 'conformidad' está en data, es una actualización explícita de conformidad
@@ -126,7 +152,7 @@ def update_envio_encuesta(idcalificacion):
             data.get('segmento', current_envio.get('segmento')),
             data.get('documento', current_envio.get('documento')),
             data.get('tipo', current_envio.get('tipo')),
-            data.get('calificacion', current_envio.get('calificacion')),
+            calificacion_final, # Usar calificacion_final validada o existente
             data.get('observaciones', current_envio.get('observaciones')),
             data.get('grupo', current_envio.get('grupo')),
             data.get('fecha_califacion', current_envio.get('fecha_califacion')),

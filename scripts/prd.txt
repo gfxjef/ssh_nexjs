@@ -1,39 +1,63 @@
-# Product Requirements Document
 
-## Project Overview
-A web application with Next.js frontend and Python Flask backend with Kafka integration. The frontend will use Tailwind CSS for styling and will include a login page and a simple SPA structure with sidebar, header, and main content.
 
-## Requirements
+Este es un proyecto para definir directrices.
 
-### Frontend (Next.js + Tailwind CSS)
-1. Create a login page with username and password fields
-2. Implement a simple SPA structure with:
-   - Sidebar navigation
-   - Header with user information and logout button
-   - Main content area
-3. Use Tailwind CSS exclusively for styling
-4. Implement authentication with JWT tokens
-5. Create responsive design that works on mobile and desktop
-6. Connect to backend API for data
+Mejoras al Dashboard de Calificaciones - PRD
 
-### Backend (Python + Flask + Kafka)
-1. Implement RESTful API endpoints
-2. Create user authentication system with JWT
-3. Set up Kafka producer/consumer for message processing
-4. Implement CORS to allow frontend connections
-5. Create database connection (use SQLite for simplicity)
-6. Implement proper error handling and logging
+OBJETIVO:
+Mejorar la visualización y comparación de datos en el dashboard de calificaciones implementando cambios en el orden de presentación y agregando funcionalidades de comparación temporal.
 
-### Integration
-1. Connect frontend to backend API
-2. Implement secure communication between services
-3. Use Context 7 MCP for documentation management
+REQUERIMIENTOS FUNCIONALES:
 
-## Technical Specifications
-- Next.js for frontend
-- Tailwind CSS for styling
-- Python Flask for backend API
-- Kafka for message processing
-- JWT for authentication
-- SQLite for database (for simplicity)
-- Context 7 MCP for documentation
+1. Reordenamiento de Tarjetas de Calificación:
+   - Modificar el orden de las tarjetas de calificación para mostrar:
+     * Calificaciones 4-6 (Regular) antes de las calificaciones 1-3 (Malo)
+   - Mantener el resto del orden actual de las tarjetas
+
+2. Implementación de Filtrado por Últimos 15 Días:
+   - Agregar opción de filtrado "Últimos 15 días" en el selector de períodos
+   - Este debe ser el filtro por defecto al cargar el dashboard
+   - Mantener las opciones de filtrado existentes
+
+3. Sistema de Comparación Temporal:
+   - Implementar comparación automática con el período anterior
+   - Para cada tarjeta de métrica, mostrar:
+     * Flecha hacia arriba (verde) o abajo (roja) según la tendencia
+     * Porcentaje de variación respecto al período anterior
+     * Ubicación en la esquina superior derecha de cada tarjeta
+   - Lógica de comparación:
+     * Comparar con el mismo número de días del período anterior
+     * Ejemplo: Si se seleccionan últimos 15 días, comparar con los 15 días previos
+   - Cálculo de variación porcentual:
+     * ((Valor actual - Valor anterior) / Valor anterior) * 100
+
+REQUERIMIENTOS TÉCNICOS:
+
+1. Modificaciones en Frontend:
+   - Actualizar el componente page.tsx para el reordenamiento de tarjetas
+   - Implementar nueva lógica de filtrado para 15 días
+   - Agregar componentes visuales para la comparación temporal
+
+2. Manejo de Datos:
+   - Implementar funciones para calcular períodos de comparación
+   - Optimizar consultas para obtener datos de períodos anteriores
+   - Mantener el rendimiento actual del dashboard
+
+3. UI/UX:
+   - Mantener la consistencia visual actual
+   - Asegurar que los nuevos elementos sean responsivos
+   - Usar los colores existentes del sistema para las flechas de tendencia
+
+CRITERIOS DE ACEPTACIÓN:
+
+1. Las tarjetas deben mostrar el orden correcto (4-6 antes de 1-3)
+2. El filtro de "Últimos 15 días" debe funcionar correctamente
+3. Las comparaciones temporales deben ser precisas y actualizarse al cambiar el período
+4. La interfaz debe mantener su responsividad y rendimiento
+5. Los cálculos de variación porcentual deben ser precisos
+
+CONSIDERACIONES ADICIONALES:
+
+- Mantener la compatibilidad con filtros existentes
+- Asegurar que los cambios no afecten otras funcionalidades del dashboard
+- Documentar los cambios en el código para futura referencia
