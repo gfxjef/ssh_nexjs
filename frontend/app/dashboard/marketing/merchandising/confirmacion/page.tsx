@@ -21,7 +21,9 @@ export default function ConfirmacionesSolicitudes() {
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [modalConfirmacionVisible, setModalConfirmacionVisible] = useState(false);
   const [modalAgregarProductoVisible, setModalAgregarProductoVisible] = useState(false);
+  const [modalCancelarVisible, setModalCancelarVisible] = useState(false);
   const [solicitudActual, setSolicitudActual] = useState<any>(null);
+  const [solicitudACancelar, setSolicitudACancelar] = useState<any>(null);
   const [productosConfirmacion, setProductosConfirmacion] = useState<{[key: string]: number}>({});
   const [productosDisponibles, setProductosDisponibles] = useState<{[key: string]: {nombre: string, cantidad: number}}>({});
   const [productoSeleccionado, setProductoSeleccionado] = useState<string>('');
@@ -248,11 +250,46 @@ export default function ConfirmacionesSolicitudes() {
     }
   };
 
+  // Nueva función para abrir el modal de cancelar solicitud
+  const abrirModalCancelar = (solicitud: any) => {
+    setSolicitudACancelar(solicitud);
+    setModalCancelarVisible(true);
+    setMensaje(null); // Limpiar mensajes previos
+  };
+
+  // Nueva función para ejecutar la cancelación de la solicitud
+  const ejecutarCancelacionSolicitud = async () => {
+    if (!solicitudACancelar) return;
+
+    setCargando(true);
+    setMensaje(null);
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/marketing/solicitudes/${solicitudACancelar.id}`, {
+        method: 'DELETE',
+      });
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(responseData.error || responseData.message || `Error ${response.status} al cancelar la solicitud.`);
+      }
+      setMensaje({ tipo: 'success', texto: `Solicitud #${solicitudACancelar.id} cancelada correctamente.` });
+      cargarSolicitudesPendientes(); // Recargar la lista de solicitudes
+      setModalCancelarVisible(false);
+      setSolicitudACancelar(null);
+    } catch (error: any) {
+      console.error("Error al cancelar solicitud:", error);
+      setMensaje({ tipo: 'error', texto: error.message || 'No se pudo cancelar la solicitud.' });
+      // Mantener el modal abierto en caso de error para que el usuario vea el mensaje
+    } finally {
+      setCargando(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Contenedor principal de la sección con posicionamiento relativo */}
       <div className="relative">
-        {cargando && <Loader mensaje={modalConfirmacionVisible || modalAgregarProductoVisible ? "Procesando..." : "Cargando solicitudes..."} />}
+        {cargando && <Loader mensaje={modalConfirmacionVisible || modalAgregarProductoVisible || modalCancelarVisible ? "Procesando..." : "Cargando solicitudes..."} />}
         
         {/* Contenido principal al que se le aplicará opacidad si el loader está activo */}
         <div className={`bg-white p-6 rounded-lg shadow-md ${cargando ? 'opacity-50' : ''}`}> 
@@ -288,12 +325,20 @@ export default function ConfirmacionesSolicitudes() {
                       </td>
                       <td className="px-4 py-2 border border-gray-200">
                         {solicitud.status === 'pending' && (
-                          <button 
-                            onClick={() => abrirModalConfirmacion(solicitud.id)}
-                            className="px-3 py-1 bg-[#2e3954] text-white text-sm rounded hover:bg-[#8dbba3] transition-colors duration-200"
-                          >
-                            Confirmar
-                          </button>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => abrirModalConfirmacion(solicitud.id)}
+                              className="px-3 py-1 bg-[#2e3954] text-white text-sm rounded hover:bg-[#8dbba3] transition-colors duration-200"
+                            >
+                              Confirmar
+                            </button>
+                            <button 
+                              onClick={() => abrirModalCancelar(solicitud)} 
+                              className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -310,7 +355,7 @@ export default function ConfirmacionesSolicitudes() {
           </div>
           
           {/* Mensajes de error o éxito Globales (fuera de modales) */}
-          {mensaje && !modalConfirmacionVisible && !modalAgregarProductoVisible && (
+          {mensaje && !modalConfirmacionVisible && !modalAgregarProductoVisible && !modalCancelarVisible && (
             <div className={`mb-6 p-3 rounded-md ${
               mensaje.tipo === 'success' 
                 ? 'bg-green-50 border-l-4 border-green-500 text-green-700' 
@@ -550,6 +595,41 @@ export default function ConfirmacionesSolicitudes() {
                     disabled={!productoSeleccionado || cantidadProducto <= 0}
                   >
                     Agregar/Actualizar Producto
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Nuevo Modal de Confirmación para Cancelar Solicitud */}
+          {modalCancelarVisible && solicitudACancelar && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-md">
+                <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center rounded-t-lg">
+                  <h3 className="text-lg font-medium text-gray-900">Cancelar Solicitud #{solicitudACancelar.id}</h3>
+                  <button onClick={() => { setModalCancelarVisible(false); setMensaje(null); }} className="text-gray-400 hover:text-gray-600 transition-colors text-2xl font-bold">
+                    &times;
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  {mensaje && modalCancelarVisible && (
+                     <div className={`mb-4 p-3 rounded-md ${ mensaje.tipo === 'success' ? 'bg-green-50 border-l-4 border-green-500 text-green-700' : 'bg-red-50 border-l-4 border-red-500 text-red-700' }`}>
+                       {mensaje.texto}
+                     </div>
+                  )}
+                  <p className="text-gray-700">¿Está seguro de que desea cancelar la solicitud de <strong>{solicitudACancelar.solicitante}</strong> (ID: {solicitudACancelar.id})?</p>
+                  <p className="text-sm text-gray-500">Esta acción cambiará el estado de la solicitud a 'cancelled' y no se podrá revertir fácilmente.</p>
+                </div>
+                <div className="bg-gray-50 px-6 py-4 border-t flex justify-end items-center space-x-2 rounded-b-lg">
+                  <button onClick={() => { setModalCancelarVisible(false); setMensaje(null); }} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors text-sm">
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={ejecutarCancelacionSolicitud}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm"
+                    disabled={cargando} // Deshabilitar si ya se está procesando
+                  >
+                    Sí, Cancelar Solicitud
                   </button>
                 </div>
               </div>

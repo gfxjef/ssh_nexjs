@@ -8,6 +8,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List, Dict, Any # Para type hints
+from .utils import ensure_column_exists # <-- Importar la nueva utilidad
 
 logger = logging.getLogger(__name__)
 stock_bp = Blueprint('stock_bp', __name__, url_prefix='/api/marketing')
@@ -477,3 +478,165 @@ def crear_solicitud():
                 conn.close()
             except Exception as e_conn_close:
                 logger.error(f"Error cerrando conexión en crear_solicitud: {e_conn_close}") 
+
+# Endpoint para obtener todos los registros de inventario para un grupo
+@stock_bp.route('/inventory', methods=['GET'])
+def obtener_inventario_completo(): # Renombrado para evitar colisión con un posible endpoint de stock
+    """
+    Parámetros: ?tabla=kossodo|kossomet
+    Devuelve todos los registros de inventario ordenados por timestamp.
+    """
+    tabla = request.args.get('tabla')
+    if tabla not in ['kossodo', 'kossomet']:
+        return jsonify({"error": "Parámetro 'tabla' inválido. Use 'kossodo' o 'kossomet'"}), 400
+    table_name = f"inventario_merch_{tabla}"
+
+    db_ops = MySQLConnection()
+    conn = None
+    cursor = None
+    try:
+        conn = db_ops._connect_internal()
+        if conn is None:
+            logger.error(f"obtener_inventario_completo: Error de conexión a la base de datos para {table_name}")
+            return jsonify({"error": "Error de conexión a la base de datos"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        # Asegurar que la tabla exista (opcional, pero bueno para robustez)
+        # Podrías tener una función ensure_table_exists similar a ensure_column_exists
+        cursor.execute(f"SELECT * FROM `{table_name}` ORDER BY timestamp DESC;") # Usar backticks para el nombre de tabla
+        registros = cursor.fetchall()
+        return jsonify(registros), 200
+    except Exception as e:
+        logger.error(f"Error al obtener inventario de {table_name}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+# Endpoint para agregar un nuevo registro de inventario
+@stock_bp.route('/inventory', methods=['POST'])
+def agregar_inventario():
+    """
+    Parámetros: ?tabla=kossodo|kossomet
+    Body JSON con campos 'responsable', 'observaciones' y cualquiera que empiece con 'merch_'.
+    """
+    tabla = request.args.get('tabla')
+    if tabla not in ['kossodo', 'kossomet']:
+        return jsonify({"error": "Parámetro 'tabla' inválido. Use 'kossodo' o 'kossomet'"}), 400
+    table_name = f"inventario_merch_{tabla}"
+    data = request.get_json() or {}
+
+    columnas = []
+    valores = []
+    for key, val in data.items():
+        if key in ['responsable', 'observaciones'] or key.startswith('merch_'):
+            columnas.append(key)
+            valores.append(val)
+
+    if not columnas:
+        return jsonify({"error": "No se han enviado campos válidos para insertar."}), 400
+
+    placeholders = ", ".join(["%s"] * len(valores))
+    cols_str = ", ".join([f"`{c}`" for c in columnas]) # Usar backticks para nombres de columna
+    query = f"INSERT INTO `{table_name}` ({cols_str}) VALUES ({placeholders});" # Usar backticks para nombre de tabla
+
+    db_ops = MySQLConnection()
+    conn = None
+    cursor = None
+    try:
+        conn = db_ops._connect_internal()
+        if conn is None:
+            logger.error(f"agregar_inventario: Error de conexión a la base de datos para {table_name}")
+            return jsonify({"error": "Error de conexión a la base de datos"}), 500
+
+        cursor = conn.cursor()
+        cursor.execute(query, tuple(valores))
+        conn.commit()
+        return jsonify({"message": "Registro agregado exitosamente", "id": cursor.lastrowid}), 201
+    except Exception as e:
+        if conn: conn.rollback()
+        logger.error(f"Error al agregar inventario en {table_name}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+# Endpoint para añadir un nuevo producto al inventario (nueva columna)
+@stock_bp.route('/nuevo_producto', methods=['POST'])
+def nuevo_producto():
+    """
+    Añade una nueva columna de producto al inventario y crea un registro inicial si se provee cantidad.
+    Body JSON con:
+      - grupo: 'kossodo' o 'kossomet'
+      - columna: nombre de la nueva columna (p.ej. 'merch_nuevo_item')
+      - cantidad: cantidad inicial (int, opcional, por defecto no se inserta si es None o no presente)
+      - responsable: (string, opcional para el registro inicial)
+    """
+    data = request.get_json() or {}
+    grupo = data.get('grupo')
+    columna_nombre_base = data.get('columna') # ej: merch_lapicero_nuevo o merch_lapicero_nuevo_eje
+    cantidad = data.get('cantidad') # Puede ser None
+    responsable = data.get('responsable') # Opcional
+
+    if grupo not in ['kossodo', 'kossomet'] or not columna_nombre_base or not columna_nombre_base.startswith('merch_'):
+        return jsonify({"error": "Datos inválidos: grupo incorrecto o nombre de columna no válido (debe empezar con 'merch_')."}), 400
+
+    table_name = f"inventario_merch_{grupo}"
+
+    # Definición de la nueva columna. Podría ser más configurable.
+    column_definition = "INT DEFAULT 0"
+
+    if not ensure_column_exists(table_name, columna_nombre_base, column_definition):
+        return jsonify({"error": f"No se pudo crear o verificar la columna '{columna_nombre_base}' en '{table_name}'."}), 500
+
+    # Si se proporciona una cantidad, se inserta un registro inicial.
+    # Esto es opcional, la columna ya está creada.
+    if cantidad is not None:
+        db_ops = MySQLConnection()
+        conn = None
+        cursor = None
+        try:
+            conn = db_ops._connect_internal()
+            if conn is None:
+                logger.error(f"nuevo_producto: Error de conexión para registro inicial en {table_name}")
+                return jsonify({"error": "Error de conexión para registro inicial"}), 500
+            
+            cursor = conn.cursor()
+            insert_cols = [f"`{columna_nombre_base}`"]
+            insert_vals = [cantidad]
+            placeholders = ["%s"]
+
+            if responsable:
+                insert_cols.append("`responsable`")
+                insert_vals.append(responsable)
+                placeholders.append("%s")
+            
+            cols_str = ", ".join(insert_cols)
+            placeholders_str = ", ".join(placeholders)
+            
+            # Asumiendo que la tabla tiene `timestamp` que se actualiza automáticamente
+            insert_query = f"INSERT INTO `{table_name}` ({cols_str}) VALUES ({placeholders_str});"
+            
+            cursor.execute(insert_query, tuple(insert_vals))
+            conn.commit()
+            return jsonify({
+                "message": f"Nuevo producto '{columna_nombre_base}' agregado y registro inicial creado con ID: {cursor.lastrowid}",
+                "id": cursor.lastrowid
+            }), 201
+        except Exception as e:
+            if conn: conn.rollback()
+            logger.error(f"Error al crear registro inicial para nuevo producto '{columna_nombre_base}' en {table_name}: {e}", exc_info=True)
+            # La columna fue creada, pero el registro inicial falló. Informar esto podría ser útil.
+            return jsonify({"error": f"Columna creada, pero falló el registro inicial: {str(e)}"}), 500
+        finally:
+            if cursor: cursor.close()
+            if conn and conn.is_connected(): conn.close()
+    else:
+        # Si no se proporciona cantidad, solo se confirma la creación de la columna (hecho por ensure_column_exists)
+        return jsonify({"message": f"Columna '{columna_nombre_base}' asegurada/creada en '{table_name}'. No se creó registro inicial."}), 200 

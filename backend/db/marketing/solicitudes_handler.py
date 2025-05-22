@@ -190,3 +190,53 @@ def confirmar_solicitud(solicitud_id):
                 conn.close()
             except Exception as e_conn:
                 logger.error(f"Error cerrando conexión en confirmar_solicitud: {e_conn}") 
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>', methods=['DELETE'])
+def cancelar_solicitud(solicitud_id):
+    """
+    Cancela una solicitud cambiando su estado a 'cancelled'.
+    """
+    db_ops = MySQLConnection()
+    conn = None
+    cursor = None
+
+    try:
+        conn = db_ops._connect_internal()
+        if conn is None:
+            logger.error(f"cancelar_solicitud: Error de conexión a la base de datos para ID {solicitud_id}")
+            return jsonify({"error": "Error de conexión a la base de datos"}), 500
+
+        cursor = conn.cursor()
+
+        # Verificar si la solicitud existe y está en un estado cancelable (opcional)
+        cursor.execute("SELECT status FROM inventario_solicitudes WHERE id = %s", (solicitud_id,))
+        solicitud = cursor.fetchone()
+
+        if not solicitud:
+            return jsonify({"error": f"Solicitud con ID {solicitud_id} no encontrada."}), 404
+        
+        # Aquí podrías añadir lógica para no cancelar si ya está 'confirmed' o 'cancelled'
+        # if solicitud[0] in ['confirmed', 'cancelled']:
+        #     return jsonify({"error": f"Solicitud {solicitud_id} ya está {solicitud[0]} y no puede ser cancelada."}), 400
+
+        update_query = "UPDATE inventario_solicitudes SET status = %s WHERE id = %s;"
+        cursor.execute(update_query, ('cancelled', solicitud_id))
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            # Esto podría pasar si el ID no existe, aunque ya lo chequeamos arriba.
+            return jsonify({"error": f"No se actualizó la solicitud {solicitud_id}. Puede que no exista."}), 404
+
+        logger.info(f"Solicitud {solicitud_id} cancelada exitosamente.")
+        return jsonify({"message": f"Solicitud {solicitud_id} cancelada exitosamente."}), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error al cancelar la solicitud {solicitud_id}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close() 
