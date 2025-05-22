@@ -15,6 +15,9 @@ from .auth import (
 # Importar el módulo de login
 from . import login
 
+# Importar el blueprint de marketing (stock)
+from .marketing import stock_bp
+
 # Inicializar tablas de autenticación al importar el paquete
 try:
     init_auth_tables()

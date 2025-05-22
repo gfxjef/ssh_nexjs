@@ -1,63 +1,38 @@
+# PRD: Actualización de la página de Solicitud de Merchandising
 
+## OBJETIVO:
+Actualizar la página de solicitud de merchandising para obtener datos de productos disponibles desde el backend a través de la API `/api/inventory/stock` y permitir a los usuarios seleccionar productos basados en su grupo y la cantidad de packs requerida.
 
-Este es un proyecto para definir directrices.
+## CONTEXTO:
+Actualmente, la página de solicitud de merchandising utiliza datos estáticos (productosEjemplo) para mostrar los productos disponibles. Necesitamos conectarla al backend para obtener datos reales de la base de datos.
 
-Mejoras al Dashboard de Calificaciones - PRD
+## REQUERIMIENTOS FUNCIONALES:
 
-OBJETIVO:
-Mejorar la visualización y comparación de datos en el dashboard de calificaciones implementando cambios en el orden de presentación y agregando funcionalidades de comparación temporal.
+### 1. Integración con API de Stock
+- Crear un servicio API en el frontend para llamar al endpoint `/api/inventory/stock?grupo=<grupo>` 
+- El endpoint devuelve un objeto JSON donde cada clave es un código de producto (prefijo 'merch_') y el valor es la cantidad disponible en stock
 
-REQUERIMIENTOS FUNCIONALES:
+### 2. Actualización de la interfaz de usuario
+- Reemplazar los datos estáticos por los datos obtenidos de la API
+- Mantener la lógica de filtrado según la cantidad de packs seleccionada
+- Mostrar/ocultar productos dependiendo de si tienen suficiente stock para la cantidad solicitada
 
-1. Reordenamiento de Tarjetas de Calificación:
-   - Modificar el orden de las tarjetas de calificación para mostrar:
-     * Calificaciones 4-6 (Regular) antes de las calificaciones 1-3 (Malo)
-   - Mantener el resto del orden actual de las tarjetas
+### 3. Formato de Datos
+- Los nombres de productos deben mostrarse de forma legible (transformando 'merch_jugo_natural' en 'Jugo Natural')
+- Los productos que terminan en '_eje' deben mostrarse en la categoría "Ejecutivo"
+- Los productos que no terminan en '_eje' deben mostrarse en la categoría "Normal"
 
-2. Implementación de Filtrado por Últimos 15 Días:
-   - Agregar opción de filtrado "Últimos 15 días" en el selector de períodos
-   - Este debe ser el filtro por defecto al cargar el dashboard
-   - Mantener las opciones de filtrado existentes
+### 4. Gestión de Estados
+- Implementar estados para controlar el loading y los errores
+- Mostrar mensajes apropiados durante la carga o en caso de error
 
-3. Sistema de Comparación Temporal:
-   - Implementar comparación automática con el período anterior
-   - Para cada tarjeta de métrica, mostrar:
-     * Flecha hacia arriba (verde) o abajo (roja) según la tendencia
-     * Porcentaje de variación respecto al período anterior
-     * Ubicación en la esquina superior derecha de cada tarjeta
-   - Lógica de comparación:
-     * Comparar con el mismo número de días del período anterior
-     * Ejemplo: Si se seleccionan últimos 15 días, comparar con los 15 días previos
-   - Cálculo de variación porcentual:
-     * ((Valor actual - Valor anterior) / Valor anterior) * 100
+## DETALLES TÉCNICOS:
+- Crear un archivo de API en `lib/api/marketingApi.ts` siguiendo el patrón existente
+- Usar React hooks para gestionar el estado y los efectos
+- Implementar funciones de transformación para convertir los datos de la API en el formato requerido por la UI
 
-REQUERIMIENTOS TÉCNICOS:
-
-1. Modificaciones en Frontend:
-   - Actualizar el componente page.tsx para el reordenamiento de tarjetas
-   - Implementar nueva lógica de filtrado para 15 días
-   - Agregar componentes visuales para la comparación temporal
-
-2. Manejo de Datos:
-   - Implementar funciones para calcular períodos de comparación
-   - Optimizar consultas para obtener datos de períodos anteriores
-   - Mantener el rendimiento actual del dashboard
-
-3. UI/UX:
-   - Mantener la consistencia visual actual
-   - Asegurar que los nuevos elementos sean responsivos
-   - Usar los colores existentes del sistema para las flechas de tendencia
-
-CRITERIOS DE ACEPTACIÓN:
-
-1. Las tarjetas deben mostrar el orden correcto (4-6 antes de 1-3)
-2. El filtro de "Últimos 15 días" debe funcionar correctamente
-3. Las comparaciones temporales deben ser precisas y actualizarse al cambiar el período
-4. La interfaz debe mantener su responsividad y rendimiento
-5. Los cálculos de variación porcentual deben ser precisos
-
-CONSIDERACIONES ADICIONALES:
-
-- Mantener la compatibilidad con filtros existentes
-- Asegurar que los cambios no afecten otras funcionalidades del dashboard
-- Documentar los cambios en el código para futura referencia
+## CRITERIOS DE ACEPTACIÓN:
+- La página debe cargar los productos desde el backend correctamente
+- El filtrado por cantidad de packs debe funcionar como se espera
+- Los productos deben mostrarse en las categorías correctas (normal/ejecutivo)
+- La interfaz debe manejar estados de carga y error adecuadamente

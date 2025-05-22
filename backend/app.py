@@ -16,6 +16,11 @@ from db.encuestas import encuestas_bp, init_encuestas_db
 # Importar el blueprint del gestor de PDFs
 from db.pdf_manager import pdf_manager_bp, init_pdf_module
 
+# Importar el blueprint de marketing (stock)
+from db.marketing import stock_bp
+from db.marketing import solicitudes_bp
+from db.marketing import historial_bp
+
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -46,6 +51,11 @@ app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
 
 # Registrar el blueprint del gestor de PDFs
 app.register_blueprint(pdf_manager_bp) # El prefijo ya está en el blueprint
+
+# Registrar el blueprint de marketing (stock)
+app.register_blueprint(stock_bp) # El prefijo ya está en el blueprint (url_prefix='/api/marketing')
+app.register_blueprint(solicitudes_bp) # <-- AÑADIR ESTA LÍNEA. El prefijo ya está en el blueprint (url_prefix='/api/marketing')
+app.register_blueprint(historial_bp) # <-- AÑADIR ESTA LÍNEA. El prefijo ya está en el blueprint (url_prefix='/api/marketing')
 
 # Inicializar la base de datos del módulo de bienestar
 with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la aplicación
