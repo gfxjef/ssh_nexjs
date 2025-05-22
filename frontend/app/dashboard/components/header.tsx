@@ -201,7 +201,7 @@ export default function Header() {
           <div className="relative">
             <button
               type="button"
-              className="flex items-center pl-1 pr-2 py-1 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#d48b45] transition-colors duration-200"
+              className="flex items-center pl-1 pr-2 py-1 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-transparent transition-colors duration-200"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
               <div className="flex items-center">
@@ -237,7 +237,7 @@ export default function Header() {
 
             {/* Dropdown menu */}
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 py-1 z-50">
+              <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white ring-1 ring-white ring-opacity-5 py-1 z-50">
                 <a
                   href="#perfil"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"

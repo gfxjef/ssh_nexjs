@@ -32,6 +32,7 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Estadísticas superiores */}
+      {/* 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {statsData.map((stat, index) => (
           <div 
@@ -85,6 +86,7 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+      */}
 
       {/* Componente de BienestarPosts */}
       <BienestarPosts 
@@ -96,8 +98,9 @@ export default function Dashboard() {
       />
       
       {/* Banner de Suscripción - Diseño elegante */}
+      {/*
       <div className="rounded-xl p-10 mb-16 relative overflow-hidden bg-gradient-to-r from-[#2e3954] to-[#3a4665] shadow-xl">
-        {/* Elementos decorativos */}
+        
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -translate-y-1/3 translate-x-1/3"></div>
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full translate-y-1/3 -translate-x-1/3"></div>
         
@@ -119,6 +122,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      */}
     </div>
   );
 }
