@@ -8,8 +8,6 @@ import { Sidebar, Menu, MenuItem, Submenu, Logo } from 'react-mui-sidebar';
 import { usePermissions } from '@/lib/permissions/PermissionsContext';
 
 // Importar iconos de MUI
-import FolderIcon from '@mui/icons-material/Folder'; // Genérico para agrupadores si se decide usar
-import DescriptionIcon from '@mui/icons-material/Description'; // Genérico para items si se decide usar
 import SettingsIcon from '@mui/icons-material/Settings';
 import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -26,6 +24,13 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import DynamicFeedIcon from '@mui/icons-material/DynamicFeed';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 
+// Tipos para la estructura de menú
+interface SubmenuItem {
+  name: string;
+  href: string;
+  icon: React.ReactElement;
+  children?: SubmenuItem[];
+}
 
 // Estructura de navegación adaptada para react-mui-sidebar con iconos
 export const navItemsConfig = [
@@ -87,18 +92,12 @@ export default function AppSidebar() {
   const { hasMenuAccess } = usePermissions();
   const pathname = usePathname() || '';
 
-  // Nueva función para verificar si un menú está activo basado en la ruta actual
-  const isMenuActive = (menuName: string) => {
-    const menuPath = `/dashboard/${menuName.toLowerCase().replace(/ y /g, '/')}`;
-    return pathname.startsWith(menuPath);
-  };
-
   // Nueva función para verificar si un submenu está activo
   const isSubmenuActive = (href: string) => {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const renderSubmenuItems = (submenuItems: any[], parentPath: string) => {
+  const renderSubmenuItems = (submenuItems: SubmenuItem[], parentPath: string) => {
     return submenuItems.map((subItem) => {
       const currentPath = `${parentPath}/${subItem.name}`;
       if (!hasMenuAccess(currentPath)) {
@@ -149,9 +148,6 @@ export default function AppSidebar() {
           if (!hasMenuAccess(item.name)) {
             return null;
           }
-
-          // Verificar si este menú principal está activo
-          const isActive = isMenuActive(item.name);
 
           return (
             <Menu key={item.name} subHeading={item.name.toUpperCase()}>

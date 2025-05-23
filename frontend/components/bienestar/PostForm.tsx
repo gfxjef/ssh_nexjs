@@ -8,15 +8,11 @@ if (typeof window !== 'undefined') {
 }
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Post, Category, PostStatus } from '../../lib/bienestar/types';
+import { Post, PostStatus } from '../../lib/bienestar/types';
 import { usePosts } from '../../app/dashboard/bienestar/context/PostsContext';
 // import TinyMCEEditor from '../wysiwyg/TinyMCEEditor'; // Eliminado
 import { ReactSummernoteLite } from '@easylogic/react-summernote-lite';
 import 'summernote/dist/summernote-lite.css';
-// Asegúrate de que jQuery esté disponible globalmente si es necesario para Summernote
-// A veces, simplemente importarlo puede ser suficiente para Webpack/bundlers.
-import 'jquery';
-
 
 interface PostFormProps {
   post?: Post;

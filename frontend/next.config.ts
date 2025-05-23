@@ -8,7 +8,16 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: 'localhost',
+      },
+    ],
   },
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Normalizar referencias a jQuery para evitar conflictos de capitalización

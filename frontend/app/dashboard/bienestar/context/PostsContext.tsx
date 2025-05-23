@@ -10,12 +10,7 @@ import {
 } from '../../../../lib/bienestar/types';
 import {
   getAllCategories as apiGetAllCategories,
-  // getCategoryById as apiGetCategoryById, // No se usa directamente en el contexto para "getCategoryById", se filtra del estado local
-  createCategory as apiCreateCategory, // Para futura admin de categorías
-  updateCategory as apiUpdateCategory, // Para futura admin de categorías
-  deleteCategory as apiDeleteCategory, // Para futura admin de categorías
   getAllPosts as apiGetAllPosts,
-  getPostById as apiGetPostById, // Se usa para obtener un post individual, podría ser útil para refrescar
   createPost as apiCreatePost,
   updatePost as apiUpdatePost,
   deletePost as apiDeletePost,
@@ -27,7 +22,6 @@ import { useNotifications } from './NotificationsContext';
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export function PostsProvider({ children }: { children: React.ReactNode }) {
-  const [posts, setPosts] = useState<Post[]>([]);
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
