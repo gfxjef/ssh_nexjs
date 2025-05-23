@@ -86,27 +86,32 @@ export default function FeaturedPostsSlider({
                 }}
               />
               
-              {/* Gradiente de oscurecimiento suave para mejorar legibilidad */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black opacity-10 z-10"></div>
+              {/* Gradiente azul de izquierda a derecha (80% a 0% opacidad) para mejorar legibilidad */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#2e3954] from-0% via-[#2e3954] via-40% to-transparent to-100% opacity-80 z-10"></div>
               
               {/* Efectos visuales (circulos decorativos) */}
               <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2 z-20"></div>
               <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full translate-y-1/4 -translate-x-1/4 z-20"></div>
               
-              {/* Contenido del slide */}
-              <div className="absolute inset-0 flex items-center justify-center z-30">
-                <div className="text-center max-w-2xl px-6">
-                  <div className="mb-3">
-                    <span className="inline-block px-3 py-1 bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm rounded-full text-white text-sm">
+              {/* Contenido del slide - Alineado a la izquierda */}
+              <div className="absolute inset-0 flex flex-col justify-between z-30 p-8">
+                {/* Contenido superior - Título */}
+                <div className="text-left max-w-lg">
+                  <h2 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg leading-tight">
+                    {post.titulo}
+                  </h2>
+                  <p className="text-white text-opacity-90 mb-4 line-clamp-3 text-lg">
+                    {post.extracto}
+                  </p>
+                </div>
+                
+                {/* Contenido inferior - Categoría y botón */}
+                <div className="text-left max-w-lg">
+                  <div className="mb-4">
+                    <span className="inline-block px-4 py-2 bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm rounded-full text-white text-sm font-medium">
                       {post.categoria}
                     </span>
                   </div>
-                  <h2 className="text-4xl font-extrabold mb-6 text-white drop-shadow-lg">
-                    {post.titulo}
-                  </h2>
-                  <p className="text-white text-opacity-80 mb-6 line-clamp-2">
-                    {post.extracto}
-                  </p>
                   <button 
                     onClick={() => handleReadMore(post.id)}
                     className="px-6 py-3 rounded-lg bg-white text-[#2e3954] font-bold transition-all duration-300 hover:bg-opacity-90 hover:shadow-lg shadow-md transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
