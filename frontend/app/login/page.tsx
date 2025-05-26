@@ -96,7 +96,7 @@ export default function Login() {
               />
             </div>
             <h1 className="text-5xl font-bold mb-4 leading-tight">Hola,<br />Bienvenido!</h1>
-            <p className="text-base leading-relaxed">Accede a la plataforma de intranet del Grupo Kossodo.</p>
+            <p className="text-base leading-relaxed">Accede a la Red Konecta del Grupo Kossodo.</p>
           </div>
         </div>
 
