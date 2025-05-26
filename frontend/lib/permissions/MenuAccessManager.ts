@@ -20,7 +20,7 @@ export class MenuAccessManager {
       this.permissions = {
         // Menús principales
         'Marketing': ['admin', 'gerente', 'vendedor', 'almacen', 'asesor', 'marketing', 'rrhh'],
-        'Ventas': ['admin', 'gerente', 'marketing'],
+        'Ventas': ['admin', 'gerente', 'marketing','atencion'],
         'Bienestar y Talento': ['admin', 'gerente', 'rrhh', 'atencion', 'invitado', 'asesor'],
         'Configuración': ['admin'],
         
@@ -36,10 +36,10 @@ export class MenuAccessManager {
         
         // Submenús de Ventas
         'Ventas/Encuestas': ['admin', 'gerente', 'atencion'],
-        'Ventas/Encuestas/Registro Calificaciones': ['admin', 'gerente', 'atencion', 'marketing'],
+        'Ventas/Encuestas/Registro Calificaciones': ['admin', 'gerente', 'atencion', 'marketing','atencion'],
         
         // Submenús de Bienestar
-        'Bienestar y Talento/Posts': ['admin', 'gerente', 'rrhh', 'invitado', 'asesor'],
+        'Bienestar y Talento/Posts': ['admin', 'gerente', 'rrhh', 'invitado', 'asesor','atencion'],
         'Bienestar y Talento/Administrar Posts': ['admin', 'rrhh'],
         'Bienestar y Talento/Documentos': ['admin', 'gerente', 'rrhh', 'atencion'],
         'Bienestar y Talento/Documentos/Administrador': ['admin', 'rrhh']
