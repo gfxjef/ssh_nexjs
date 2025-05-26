@@ -10,3 +10,4 @@ Pillow==10.0.1
 python-magic==0.4.27
 python-magic-bin==0.4.14
 werkzeug==2.3.7
+gunicorn==21.2.0

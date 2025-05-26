@@ -32,6 +32,9 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
   useEffect(() => {
     const loadUserRole = () => {
       try {
+        // Verificar que estamos en el cliente antes de acceder a localStorage
+        if (typeof window === 'undefined') return;
+        
         const userJson = localStorage.getItem('user');
         if (userJson) {
           const userData = JSON.parse(userJson);
@@ -55,11 +58,16 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
       loadUserRole();
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    // Verificar que window existe antes de usar addEventListener
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange);
+    }
     
     // Limpiar listener
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorageChange);
+      }
     };
   }, []);
 

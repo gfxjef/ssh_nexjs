@@ -42,7 +42,7 @@ export default function Login() {
     try {
       console.log('🔑 [LOGIN] Intentando login con:', credentials.usuario);
       
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -73,7 +73,7 @@ export default function Login() {
     }
   };
 
-  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {    e.preventDefault();    if (!recoveryEmail) {      setError('Correo electrónico es requerido');      setSuccessMessage('');      return;    }    setIsLoading(true);    setError('');    setSuccessMessage('');        try {      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/api/auth/recuperar-password`;            console.log('Solicitud de recuperación para:', recoveryEmail);            const response = await fetch(apiUrl, {        method: 'POST',        headers: { 'Content-Type': 'application/json' },        body: JSON.stringify({ email: recoveryEmail }),      });            const data = await response.json();            if (!response.ok) {        throw new Error(data.message || 'Error al enviar el correo de recuperación');      }            setSuccessMessage(data.message || `Se ha enviado un enlace de recuperación a ${recoveryEmail}.`);          } catch (err: any) {      console.error('Error en recuperación de contraseña:', err);      setError(err.message || 'Error al procesar la solicitud');    } finally {      setIsLoading(false);    }  };
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {    e.preventDefault();    if (!recoveryEmail) {      setError('Correo electrónico es requerido');      setSuccessMessage('');      return;    }    setIsLoading(true);    setError('');    setSuccessMessage('');        try {      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'}/api/auth/recuperar-password`;            console.log('Solicitud de recuperación para:', recoveryEmail);            const response = await fetch(apiUrl, {        method: 'POST',        headers: { 'Content-Type': 'application/json' },        body: JSON.stringify({ email: recoveryEmail }),      });            const data = await response.json();            if (!response.ok) {        throw new Error(data.message || 'Error al enviar el correo de recuperación');      }            setSuccessMessage(data.message || `Se ha enviado un enlace de recuperación a ${recoveryEmail}.`);          } catch (err: any) {      console.error('Error en recuperación de contraseña:', err);      setError(err.message || 'Error al procesar la solicitud');    } finally {      setIsLoading(false);    }  };
 
   return (
     <div 

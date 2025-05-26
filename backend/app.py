@@ -268,8 +268,8 @@ if __name__ == '__main__':
     print("6. POST /api/auth/cambiar-password - Headers: {'Authorization': 'Bearer xxxxx'} Body: {'currentPassword': 'xxx', 'newPassword': 'xxx'}")
 
     host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
-    port = int(os.getenv('FLASK_RUN_PORT', 5000))
-    debug_str = os.getenv('FLASK_DEBUG', 'True')
+    port = int(os.getenv('PORT', os.getenv('FLASK_RUN_PORT', 5000)))
+    debug_str = os.getenv('FLASK_DEBUG', 'False')
     debug = debug_str.lower() in ['true', '1', 't', 'y', 'yes']
 
     print(f"Servidor ejecutándose en {host}:{port} con debug={debug}")
