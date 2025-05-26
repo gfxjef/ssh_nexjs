@@ -53,8 +53,9 @@ class MySQLConnection:
             else:
                 conn.commit()
                 affected_rows = cursor.rowcount
-                # print(f"MySQLConnection: execute_query() - Commit. Filas afectadas: {affected_rows}")
-                return {"affected_rows": affected_rows}
+                last_id = cursor.lastrowid
+                # print(f"MySQLConnection: execute_query() - Commit. Filas afectadas: {affected_rows}, Last ID: {last_id}")
+                return {"affected_rows": affected_rows, "last_insert_id": last_id}
                 
         except Error as e_query:
             print(f"MySQLConnection: execute_query() - Error MySQL '{e_query.errno}' al ejecutar '{query[:100]}...': {e_query.msg}")

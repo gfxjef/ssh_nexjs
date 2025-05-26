@@ -1,0 +1,188 @@
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+SISTEMA DE GRUPOS EMPRESARIALES PARA DOCUMENTOS
+
+===================================================================
+
+## RESUMEN EJECUTIVO
+
+### Objetivo
+Implementar un sistema de clasificación por grupos empresariales para el módulo de documentos, permitiendo organizar y filtrar documentos según la entidad empresarial correspondiente: Kossodo, Kossomet, o Grupo Kossodo.
+
+### Justificación
+Los documentos del sistema deben estar organizados por grupo empresarial para facilitar la gestión, búsqueda y control de acceso específico según la estructura organizacional del Grupo Kossodo.
+
+### Alcance
+- Modificación de la base de datos para incluir clasificación por grupos
+- Actualización de todos los endpoints APIs para manejar filtros por grupo
+- Modificación de la interfaz de usuario para incluir selectores y filtros de grupo
+- Actualización del sistema de búsqueda para incluir filtros por grupo
+- Posible implementación de permisos específicos por grupo
+
+===================================================================
+
+## DEFINICIÓN DE GRUPOS EMPRESARIALES
+
+### Grupos Disponibles
+1. **Kossodo** - Entidad principal
+2. **Kossomet** - Subsidiaria/división específica  
+3. **Grupo Kossodo** - Documentos corporativos generales
+
+### Reglas de Negocio
+- Todo documento DEBE tener un grupo asignado
+- Los grupos son mutuamente excluyentes (un documento pertenece a un solo grupo)
+- Por defecto, se asigna "Grupo Kossodo" si no se especifica
+- Los usuarios pueden tener acceso diferenciado por grupo según sus permisos
+
+===================================================================
+
+## REQUISITOS TÉCNICOS
+
+### 1. BASE DE DATOS
+**Modificaciones requeridas:**
+- Agregar columna `grupo` tipo ENUM('kossodo', 'kossomet', 'grupo_kossodo') a tabla `documentos`
+- Valor por defecto: 'grupo_kossodo'
+- Índice en la columna para optimizar consultas
+- Migración de datos existentes
+
+### 2. BACKEND - APIs
+**Endpoints a modificar:**
+- GET /api/documents - Agregar filtro `grupo` en query parameters
+- POST /api/documents - Incluir campo `grupo` en body
+- PUT /api/documents/{id} - Permitir actualización del campo `grupo`
+- GET /api/search/suggestions - Incluir sugerencias por grupo
+- GET /api/search/advanced - Filtros avanzados por grupo
+
+**Nuevos endpoints:**
+- GET /api/groups - Listar grupos disponibles con metadatos
+- GET /api/documents/stats/by-group - Estadísticas por grupo
+
+### 3. FRONTEND - COMPONENTES
+**Componentes a modificar:**
+- DocumentCard: Mostrar badge del grupo
+- AdvancedSearchBar: Filtro de selección de grupos
+- DocumentUploader: Selector de grupo obligatorio
+- CategoryFilter: Posible filtrado combinado grupo+categoría
+- DocumentManager: Columna de grupo en vistas de lista
+
+**Nuevos componentes:**
+- GroupSelector: Componente reutilizable para selección de grupos
+- GroupBadge: Badge visual para mostrar el grupo del documento
+- GroupFilter: Filtro específico de grupos con contadores
+
+### 4. SISTEMA DE PERMISOS
+**Consideraciones:**
+- Evaluar si se requieren permisos específicos por grupo
+- Usuarios podrían tener acceso limitado a ciertos grupos
+- Administradores de grupo vs administradores globales
+
+### 5. BÚSQUEDA Y FILTRADO
+**Funcionalidades:**
+- Búsqueda combinada: texto + categoría + etiquetas + grupo
+- Autocompletado que incluya contexto de grupo
+- Filtros rápidos por grupo en sidebar o header
+- Ordenamiento por grupo en resultados
+
+===================================================================
+
+## EXPERIENCIA DE USUARIO
+
+### Flujo de Subida de Documentos
+1. Usuario selecciona archivo
+2. Completa metadatos (título, descripción, categoría)
+3. **NUEVO:** Selecciona grupo empresarial (dropdown obligatorio)
+4. Asigna etiquetas opcionales
+5. Confirma subida
+
+### Flujo de Búsqueda/Visualización
+1. Usuario accede a documentos
+2. Ve filtros: Categorías, Etiquetas, **NUEVO: Grupos**
+3. Puede filtrar por uno o múltiples grupos
+4. Documentos se muestran con badge de grupo visible
+5. Búsqueda avanzada incluye selector de grupos
+
+### Interfaz Visual
+- **Colores por grupo:**
+  - Kossodo: Azul (#2563EB)
+  - Kossomet: Verde (#059669) 
+  - Grupo Kossodo: Gris corporativo (#6B7280)
+- **Iconos:**
+  - Kossodo: 🏢
+  - Kossomet: 🏭
+  - Grupo Kossodo: 🏛️
+
+===================================================================
+
+## CASOS DE USO ESPECÍFICOS
+
+### Caso 1: Administrador subiendo documento de Kossomet
+- Selecciona archivo de procedimientos
+- Especifica grupo "Kossomet"
+- Categoría "Operaciones"
+- El documento es visible solo para usuarios con acceso a Kossomet
+
+### Caso 2: Usuario buscando documentos de Kossodo
+- Aplica filtro de grupo "Kossodo"
+- Ve solo documentos relevantes a esa entidad
+- Puede combinar con filtros de categoría
+
+### Caso 3: Reporte general del Grupo
+- Administrador busca documentos de "Grupo Kossodo"
+- Ve políticas generales que aplican a todas las entidades
+- Genera reporte consolidado
+
+===================================================================
+
+## CONSIDERACIONES TÉCNICAS
+
+### Migración de Datos
+- Script para asignar grupo por defecto a documentos existentes
+- Posible asignación inteligente basada en categorías actuales
+- Validación de integridad de datos post-migración
+
+### Rendimiento
+- Índices optimizados para consultas por grupo
+- Cache de contadores por grupo
+- Paginación eficiente con filtros combinados
+
+### Compatibilidad
+- Mantener APIs existentes funcionando
+- Parámetro grupo opcional inicialmente para retrocompatibilidad
+- Versionado de API si es necesario
+
+===================================================================
+
+## CRITERIOS DE ACEPTACIÓN
+
+### Backend
+- [ ] Columna grupo agregada a base de datos
+- [ ] Todos los endpoints manejan filtros por grupo
+- [ ] Migración de datos existentes completada
+- [ ] Tests unitarios actualizados
+
+### Frontend  
+- [ ] Selector de grupo en formulario de subida
+- [ ] Filtros por grupo en búsqueda avanzada
+- [ ] Badges de grupo en tarjetas de documentos
+- [ ] Estadísticas por grupo en dashboard
+
+### Integración
+- [ ] Búsqueda combinada funciona correctamente
+- [ ] Permisos por grupo implementados (si aplicable)
+- [ ] Rendimiento optimizado para consultas por grupo
+- [ ] Documentación actualizada
+
+===================================================================
+
+## CRONOGRAMA ESTIMADO
+- Análisis detallado y diseño: 0.5 días
+- Modificaciones de base de datos: 0.5 días  
+- Actualización de backend/APIs: 1 día
+- Modificación de componentes frontend: 1 día
+- Integración y testing: 0.5 días
+- **Total estimado: 3.5 días**
+
+===================================================================
+
+PRIORIDAD: ALTA
+COMPLEJIDAD: MEDIA-ALTA
+IMPACTO: ALTO (Afecta todo el sistema de documentos) 

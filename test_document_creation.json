@@ -1,0 +1,7 @@
+{
+  "titulo": "Documento de Prueba",
+  "descripcion": "Test simple de creación",
+  "categoria_id": 1,
+  "etiquetas": [1],
+  "es_publico": true
+} 

@@ -246,15 +246,7 @@ export default function Header() {
                   Mi Perfil
                 </a>
                 
-                <WithPermission permissionId="Configuración" type="menu">
-                  <a
-                    href="#configuracion"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
-                    role="menuitem"
-                  >
-                    Configuración
-                  </a>
-                </WithPermission>
+                                <Link                  href="/configuracion"                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"                  role="menuitem"                  onClick={() => setDropdownOpen(false)}                >                  Configuración                </Link>
                 
                 <div className="border-t border-gray-200 my-1"></div>
                 <button

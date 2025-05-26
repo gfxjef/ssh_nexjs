@@ -23,6 +23,9 @@ import PollIcon from '@mui/icons-material/Poll';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import DynamicFeedIcon from '@mui/icons-material/DynamicFeed';
 import EditNoteIcon from '@mui/icons-material/EditNote';
+import DescriptionIcon from '@mui/icons-material/Description';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
 // Tipos para la estructura de menú
 interface SubmenuItem {
@@ -63,14 +66,12 @@ export const navItemsConfig = [
     icon: <FavoriteIcon />,
     submenus: [
       { name: 'Posts', href: '/dashboard/bienestar/posts', icon: <DynamicFeedIcon /> },
-      { name: 'Administrar Posts', href: '/dashboard/bienestar/admin-posts', icon: <EditNoteIcon /> }
+      { name: 'Administrar Posts', href: '/dashboard/bienestar/admin-posts', icon: <EditNoteIcon /> },
+      { name: 'Documentos', href: '/dashboard/bienestar/documentos', icon: <DescriptionIcon />, isGrouper: true, children: [
+        { name: 'Visualizar', href: '/dashboard/bienestar/documentos', icon: <VisibilityIcon /> },
+        { name: 'Administrador', href: '/dashboard/bienestar/documentos/admin', icon: <AdminPanelSettingsIcon /> }
+      ]}
     ],
-  },
-  {
-    name: 'Configuración',
-    icon: <SettingsIcon />,
-    href: '/dashboard/configuracion',
-    submenus: [],
   }
 ];
 
@@ -181,16 +182,7 @@ export default function AppSidebar() {
                     }
                     return null;
                 })
-                : item.href ? (
-                  <MenuItem
-                    component={Link}
-                    link={item.href}
-                    isSelected={pathname === item.href}
-                    icon={item.icon} 
-                  >
-                    {item.name}
-                  </MenuItem>
-                ) : null
+                                : null
               }
             </Menu>
           );

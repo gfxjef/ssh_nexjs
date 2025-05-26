@@ -35,32 +35,23 @@ export default function RecuperarPassword() {
     setSuccessMessage('');
     
     try {
-      // Aquí puedes agregar la lógica real de recuperación de contraseña
       const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/api/auth/recuperar-password`;
       
-      // Por ahora simulamos la respuesta
       console.log('Solicitud de recuperación para:', recoveryEmail);
-      setTimeout(() => {
-        setSuccessMessage(`Se ha enviado un enlace de recuperación a ${recoveryEmail}.`);
-        setIsLoading(false);
-      }, 1500);
       
-      // Código para cuando tengas el endpoint real:
-      /*
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: recoveryEmail }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.message || 'Error al enviar el correo de recuperación');
       }
       
-      const data = await response.json();
       setSuccessMessage(data.message || `Se ha enviado un enlace de recuperación a ${recoveryEmail}.`);
-      */
       
     } catch (err: any) {
       console.error('Error en recuperación de contraseña:', err);

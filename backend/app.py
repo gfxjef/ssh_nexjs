@@ -1,4 +1,3 @@
-import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import jwt
@@ -9,6 +8,9 @@ from db.mysql_connection import MySQLConnection
 
 # Importar el blueprint de bienestar
 from db.bienestar import bienestar_bp, init_bienestar_db
+
+# Importar el blueprint de documentos de bienestar
+from db.bienestar.documentos import documentos_bp
 
 # Importar el blueprint de encuestas
 from db.encuestas import encuestas_bp, init_encuestas_db
@@ -45,6 +47,9 @@ from db.config import get_jwt_secret
 
 # Registrar el blueprint de bienestar con el prefijo correcto
 app.register_blueprint(bienestar_bp, url_prefix='/api/bienestar')
+
+# Registrar el blueprint de documentos de bienestar 
+app.register_blueprint(documentos_bp)
 
 # Registrar el blueprint de encuestas con el prefijo correcto
 app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
@@ -110,6 +115,78 @@ def login():
     
     print(f"ÉXITO: Usuario {usuario} autenticado correctamente")
     return jsonify(auth_result)
+
+@app.route('/api/auth/recuperar-password', methods=['POST'])
+def recuperar_password():
+    """
+    Endpoint para recuperar contraseña por correo electrónico.
+    Recibe el correo del usuario y envía sus credenciales por email.
+    """
+    data = request.get_json()
+    correo = data.get('email')
+    
+    print(f"Solicitud de recuperación de contraseña para: {correo}")
+    
+    if not correo:
+        return jsonify({'message': 'Correo electrónico es requerido'}), 400
+    
+    # Usar nuestra función de recuperación de contraseña
+    resultado = db.login.procesar_recuperacion_password(correo)
+    
+    if resultado['success']:
+        print(f"ÉXITO: Proceso de recuperación completado para {correo}")
+        return jsonify({
+            'message': resultado['message'],
+            'success': True
+        }), 200
+    else:
+        print(f"ERROR: Proceso de recuperación falló para {correo}: {resultado['message']}")
+        return jsonify({
+            'message': resultado['message'],
+            'success': False
+        }), 400
+
+@app.route('/api/auth/cambiar-password', methods=['POST'])
+def cambiar_password():
+    """
+    Endpoint para cambiar la contraseña de un usuario autenticado.
+    Requiere token JWT válido y contraseña actual.
+    """
+    auth_header = request.headers.get('Authorization')
+    
+    if not auth_header:
+        return jsonify({'message': 'Token no proporcionado'}), 401
+    
+    try:
+        token = auth_header.split(' ')[1]
+        data = request.get_json()
+        
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+        
+        print(f"Solicitud de cambio de contraseña recibida")
+        
+        if not current_password or not new_password:
+            return jsonify({'message': 'Contraseña actual y nueva contraseña son requeridas'}), 400
+        
+        # Usar nuestra función de cambio de contraseña
+        resultado = db.login.procesar_cambio_password(token, current_password, new_password)
+        
+        if resultado['success']:
+            print(f"ÉXITO: Contraseña cambiada exitosamente")
+            return jsonify({
+                'message': resultado['message'],
+                'success': True
+            }), 200
+        else:
+            print(f"ERROR: {resultado['message']}")
+            return jsonify({
+                'message': resultado['message'],
+                'success': False
+            }), 400
+            
+    except (IndexError, KeyError):
+        return jsonify({'message': 'Token inválido'}), 401
 
 @app.route('/api/user/profile', methods=['GET'])
 def profile():
@@ -187,6 +264,8 @@ if __name__ == '__main__':
     print("2. GET /api/user/profile - Headers: {'Authorization': 'Bearer xxxxx'}")
     print("3. GET /api/verify/table - Para verificar la estructura de la tabla")
     print("4. GET /api/usuarios - Para listar los primeros 10 usuarios")
+    print("5. POST /api/auth/recuperar-password - Body: {'email': 'usuario@correo.com'}")
+    print("6. POST /api/auth/cambiar-password - Headers: {'Authorization': 'Bearer xxxxx'} Body: {'currentPassword': 'xxx', 'newPassword': 'xxx'}")
 
     host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_RUN_PORT', 5000))
@@ -194,4 +273,4 @@ if __name__ == '__main__':
     debug = debug_str.lower() in ['true', '1', 't', 'y', 'yes']
 
     print(f"Servidor ejecutándose en {host}:{port} con debug={debug}")
-    app.run(debug=debug, host=host, port=port)
+    app.run(debug=debug, host=host, port=port) 

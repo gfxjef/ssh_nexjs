@@ -9,8 +9,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faLock, faEnvelope } from '@fortawesome/free-solid-svg-icons';
 
 export default function Login() {
-  const [usuario, setUsuario] = useState('');
-  const [pass, setPass] = useState('');
+  const [credentials, setCredentials] = useState({
+    usuario: '',
+    pass: ''
+  });
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -32,57 +34,46 @@ export default function Login() {
     setSuccessMessage('');
   }, [isForgotPassword]);
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!usuario || !pass) {
-      setError('Usuario y contraseña son requeridos');
-      setSuccessMessage('');
-      return;
-    }
     setIsLoading(true);
     setError('');
-    setSuccessMessage('');
+
     try {
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/api/auth/login`;
-      const response = await fetch(apiUrl, {
+      console.log('🔑 [LOGIN] Intentando login con:', credentials.usuario);
+      
+      const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, pass }),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(credentials)
       });
-      if (!response.ok) {
+
+      if (response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Error de autenticación');
+        console.log('✅ [LOGIN] Login exitoso:', data);
+        
+        // Guardar token y datos del usuario en localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.usuario));
+        
+        // Redirigir al dashboard
+        router.push('/dashboard');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Error al iniciar sesión');
+        console.error('❌ [LOGIN] Error:', errorData);
       }
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.usuario));
-      console.log('Login exitoso:', data);
-      setSuccessMessage('¡Ingreso exitoso! Redirigiendo...');
-      router.push('/dashboard');
-    } catch (err: any) {
-      console.error('Error de login:', err);
-      setError(err.message || 'Credenciales inválidas');
+    } catch (error) {
+      console.error('❌ [LOGIN] Error de red:', error);
+      setError('Error de conexión. Verifica que el servidor esté funcionando.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recoveryEmail) {
-      setError('Correo electrónico es requerido');
-      setSuccessMessage('');
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    setSuccessMessage('');
-    console.log('Solicitud de recuperación para:', recoveryEmail);
-    setTimeout(() => {
-      setSuccessMessage(`Se ha enviado un enlace de recuperación a ${recoveryEmail}. (Simulación)`);
-      setIsLoading(false);
-    }, 1500);
-  };
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {    e.preventDefault();    if (!recoveryEmail) {      setError('Correo electrónico es requerido');      setSuccessMessage('');      return;    }    setIsLoading(true);    setError('');    setSuccessMessage('');        try {      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/api/auth/recuperar-password`;            console.log('Solicitud de recuperación para:', recoveryEmail);            const response = await fetch(apiUrl, {        method: 'POST',        headers: { 'Content-Type': 'application/json' },        body: JSON.stringify({ email: recoveryEmail }),      });            const data = await response.json();            if (!response.ok) {        throw new Error(data.message || 'Error al enviar el correo de recuperación');      }            setSuccessMessage(data.message || `Se ha enviado un enlace de recuperación a ${recoveryEmail}.`);          } catch (err: any) {      console.error('Error en recuperación de contraseña:', err);      setError(err.message || 'Error al procesar la solicitud');    } finally {      setIsLoading(false);    }  };
 
   return (
     <div 
@@ -117,32 +108,32 @@ export default function Login() {
               <h2 className="text-3xl font-semibold text-[#3C4262] mb-7 text-left">Iniciar sesión</h2>
               {error && <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded-md">{error}</div>}
               {successMessage && <div className="mb-4 p-3 text-sm text-green-700 bg-green-100 rounded-md">{successMessage}</div>}
-              <form onSubmit={handleLoginSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="input-group relative">
-                  <label htmlFor="username" className="block text-sm font-medium text-gray-600 mb-2">Email o usuario</label>
+                  <label htmlFor="usuario" className="block text-sm font-medium text-gray-600 mb-2">Usuario o Correo</label>
                   <FontAwesomeIcon icon={faUser} className="absolute left-3 top-1/2 transform -translate-y-1/2 mt-3 text-[#6CBA9D] text-sm" />
                   <input
                     type="text"
-                    id="username"
-                    name="username"
-                    placeholder="nombre o nombre@grupo.com"
+                    id="usuario"
+                    name="usuario"
+                    placeholder="Ingresa tu usuario o correo"
                     required
-                    value={usuario}
-                    onChange={(e) => setUsuario(e.target.value)}
+                    value={credentials.usuario}
+                    onChange={(e) => setCredentials(prev => ({ ...prev, usuario: e.target.value }))}
                     className="w-full py-3 px-4 pl-10 border border-gray-300 rounded-lg box-border text-sm text-gray-800 bg-white/80 focus:ring-2 focus:ring-[#6CBA9D] focus:border-transparent outline-none"
                   />
                 </div>
                 <div className="input-group relative">
-                  <label htmlFor="passwordLogin" className="block text-sm font-medium text-gray-600 mb-2">Contraseña</label>
+                  <label htmlFor="pass" className="block text-sm font-medium text-gray-600 mb-2">Contraseña</label>
                   <FontAwesomeIcon icon={faLock} className="absolute left-3 top-1/2 transform -translate-y-1/2 mt-3 text-[#6CBA9D] text-sm" />
                   <input
                     type="password"
-                    id="passwordLogin"
-                    name="password"
-                    placeholder="••••••••••"
+                    id="pass"
+                    name="pass"
+                    placeholder="Ingresa tu contraseña"
                     required
-                    value={pass}
-                    onChange={(e) => setPass(e.target.value)}
+                    value={credentials.pass}
+                    onChange={(e) => setCredentials(prev => ({ ...prev, pass: e.target.value }))}
                     className="w-full py-3 px-4 pl-10 border border-gray-300 rounded-lg box-border text-sm text-gray-800 bg-white/80 focus:ring-2 focus:ring-[#6CBA9D] focus:border-transparent outline-none"
                   />
                 </div>
@@ -151,7 +142,7 @@ export default function Login() {
                   disabled={isLoading}
                   className="w-full bg-[#6CBA9D] text-white py-3.5 px-5 border-none rounded-lg cursor-pointer text-base font-semibold transition-colors duration-300 ease-in-out hover:bg-[#5aa085] disabled:opacity-50 disabled:cursor-not-allowed mt-2.5"
                 >
-                  {isLoading ? 'Ingresando...' : 'Ingresar'}
+                  {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                 </button>
               </form>
               <div className="forgot-password text-right mt-4">

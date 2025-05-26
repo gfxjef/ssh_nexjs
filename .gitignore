@@ -45,5 +45,9 @@ tasks/
 # Frontend uploads
 frontend/public/uploads/posts/
 
+# Backend uploads
+backend/uploads/
+backend/uploads/documentos/
+
 # Backend specific files
 backend/db/pdf_manager/pdf_files/ 

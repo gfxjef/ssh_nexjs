@@ -17,4 +17,11 @@ export { PermissionButton } from './PermissionButton';
 export { 
   updatePermission, 
   removePermission 
-} from './updatePermissions'; 
+} from './updatePermissions';
+
+// Permisos específicos de documentos
+export { 
+  useDocumentsPermissions,
+  DOCUMENTS_PERMISSIONS,
+  checkDocumentPermission
+} from './documentsPermissions'; 

@@ -40,7 +40,9 @@ export class MenuAccessManager {
         
         // Submenús de Bienestar
         'Bienestar y Talento/Posts': ['admin', 'gerente', 'rrhh'],
-        'Bienestar y Talento/Administrar Posts': ['admin', 'rrhh']
+        'Bienestar y Talento/Administrar Posts': ['admin', 'rrhh'],
+        'Bienestar y Talento/Documentos': ['admin', 'gerente', 'rrhh', 'atencion'],
+        'Bienestar y Talento/Documentos/Administrador': ['admin', 'rrhh']
       };
       
       // Permisos para botones específicos
@@ -49,7 +51,21 @@ export class MenuAccessManager {
         'update-pdf': ['admin'],
         'add-post': ['admin', 'rrhh'],
         'edit-post': ['admin', 'rrhh'],
-        'delete-post': ['admin']
+        'delete-post': ['admin'],
+        
+        // Permisos para documentos
+        'documents.view': ['admin', 'gerente', 'rrhh', 'atencion'],
+        'documents.upload': ['admin', 'rrhh', 'atencion'],
+        'documents.edit': ['admin', 'rrhh'],
+        'documents.delete': ['admin'],
+        'documents.admin': ['admin', 'rrhh'],
+        'documents.download': ['admin', 'gerente', 'rrhh', 'atencion'],
+        'documents.create-category': ['admin', 'rrhh'],
+        'documents.edit-category': ['admin', 'rrhh'],
+        'documents.delete-category': ['admin'],
+        'documents.create-tag': ['admin', 'rrhh'],
+        'documents.edit-tag': ['admin', 'rrhh'],
+        'documents.delete-tag': ['admin']
       };
       
       console.log('Permisos inicializados correctamente');
