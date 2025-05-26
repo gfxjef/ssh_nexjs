@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = '0%';
         progressInfo.textContent = 'Subiendo archivo...';
         
-        // Paso 1: Subir archivo de forma asíncrona
+        // Subir y procesar archivo directamente
         fetch(AppConfig.getFullPath('upload-pdf-async'), {
             method: 'POST',
             body: formData
@@ -439,48 +439,26 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             if (data.success) {
-                progressInfo.textContent = 'Archivo subido, iniciando procesamiento...';
-                // Paso 2: Iniciar procesamiento en background
-                return startBackgroundProcessing();
+                showSuccess(`PDF procesado: ${data.pdf_name} (${data.pages} páginas)`);
+                resetFileInput();
             } else {
-                throw new Error(data.error || 'Error al subir archivo');
+                throw new Error(data.error || 'Error al procesar archivo');
             }
         })
         .catch(error => {
             showError(`Error: ${error.message}`);
             console.error('Error completo:', error);
-            progressContainer.style.display = 'none';
-            submitBtn.disabled = false;
-        });
-        
-        // Iniciar consulta periódica de progreso
-        checkProgress();
-    }
-
-    // Función para iniciar procesamiento en background
-    function startBackgroundProcessing() {
-        return fetch(AppConfig.getFullPath('process-pdf-background'), {
-            method: 'POST'
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                showSuccess(`PDF procesado: ${data.pdf_name} (${data.pages} páginas)`);
-                resetFileInput();
-            } else {
-                throw new Error(data.error || 'Error en procesamiento');
-            }
         })
         .finally(() => {
             progressContainer.style.display = 'none';
             submitBtn.disabled = false;
         });
+        
+        // Iniciar consulta periódica de progreso para mostrar avance
+        checkProgress();
     }
+
+
 
     // Función para consultar el progreso
     function checkProgress() {

@@ -418,7 +418,7 @@ def send_report_email(report_data, user_data):
 
 @pdf_manager_bp.route('/upload-pdf-async', methods=['POST'])
 def upload_pdf_async_api():
-    """Endpoint API para subir PDF y procesarlo de forma asíncrona."""
+    """Endpoint API para subir PDF y procesarlo directamente con timeout extendido."""
     processor = get_pdf_processor()
     
     if 'pdf' not in request.files:
@@ -437,27 +437,40 @@ def upload_pdf_async_api():
         try:
             # Guardar archivo temporalmente
             file.save(temp_path)
-            logger.info(f"PDF guardado temporalmente para procesamiento asíncrono: {temp_path}")
+            logger.info(f"PDF guardado temporalmente: {temp_path}")
             
-            # Iniciar procesamiento en background (simulado)
-            processor.current_progress = {
-                "status": "queued",
-                "current_file": filename,
-                "current_page": 0,
-                "total_pages": 0,
-                "percentage": 0,
-                "temp_path": temp_path
-            }
+            # Procesar directamente con timeout extendido
+            logger.info(f"Iniciando procesamiento directo de: {filename}")
+            result = processor.process_pdf(temp_path, delete_after=True)
             
-            return jsonify({
-                'success': True,
-                'message': f'PDF {filename} en cola para procesamiento',
-                'status': 'queued',
-                'filename': filename
-            })
+            if result.get('success', False):
+                logger.info(f"Procesamiento exitoso: {result.get('pdf_name')} con {result.get('pages')} páginas")
+                return jsonify({
+                    'success': True,
+                    'pdf_name': result.get('pdf_name'),
+                    'pages': result.get('pages'),
+                    'images_relative_paths': result.get('images_relative_paths'),
+                    'thumbnail_relative_path': result.get('thumbnail_relative_path'),
+                    'original_pdf_stored_path': result.get('original_pdf_stored_path'),
+                    'message': f"PDF {result.get('pdf_name')} procesado con {result.get('pages', 0)} páginas."
+                })
+            else:
+                error_msg = result.get('error', 'Error desconocido durante el procesamiento')
+                logger.error(f"Error en procesamiento: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': error_msg
+                }), 500
             
         except Exception as e:
             logger.error(f"Error en upload_pdf_async: {str(e)}", exc_info=True)
+            # Limpiar archivo temporal si hay error
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                    logger.info(f"Archivo temporal eliminado tras error: {temp_path}")
+                except Exception as e_del:
+                    logger.warning(f"No se pudo eliminar archivo temporal: {e_del}")
             return jsonify({'success': False, 'error': str(e)}), 500
             
     return jsonify({'success': False, 'error': 'Tipo de archivo no permitido'}), 400
@@ -467,19 +480,36 @@ def process_pdf_background():
     """Procesar PDF en background para evitar timeouts."""
     processor = get_pdf_processor()
     
-    # Verificar si hay un PDF en cola
-    if processor.current_progress.get('status') != 'queued':
-        return jsonify({'success': False, 'error': 'No hay PDF en cola para procesar'}), 400
+    # Log del estado actual para debug
+    current_status = processor.current_progress.get('status', 'unknown')
+    logger.info(f"Estado actual del procesador: {current_status}")
+    logger.info(f"Progreso completo: {processor.current_progress}")
+    
+    # Verificar si hay un PDF en cola o si ya está procesando
+    if current_status not in ['queued', 'processing']:
+        error_msg = f'No hay PDF en cola para procesar. Estado actual: {current_status}'
+        logger.warning(error_msg)
+        return jsonify({'success': False, 'error': error_msg}), 400
     
     temp_path = processor.current_progress.get('temp_path')
-    if not temp_path or not os.path.exists(temp_path):
-        return jsonify({'success': False, 'error': 'Archivo temporal no encontrado'}), 400
+    if not temp_path:
+        error_msg = 'No se encontró ruta temporal en el estado del procesador'
+        logger.error(error_msg)
+        return jsonify({'success': False, 'error': error_msg}), 400
+        
+    if not os.path.exists(temp_path):
+        error_msg = f'Archivo temporal no encontrado: {temp_path}'
+        logger.error(error_msg)
+        return jsonify({'success': False, 'error': error_msg}), 400
     
     try:
+        logger.info(f"Iniciando procesamiento de: {temp_path}")
+        
         # Procesar el PDF
         result = processor.process_pdf(temp_path, delete_after=True)
         
         if result.get('success', False):
+            logger.info(f"Procesamiento exitoso: {result.get('pdf_name')} con {result.get('pages')} páginas")
             return jsonify({
                 'success': True,
                 'pdf_name': result.get('pdf_name'),
@@ -490,9 +520,11 @@ def process_pdf_background():
                 'message': f"PDF {result.get('pdf_name')} procesado con {result.get('pages', 0)} páginas."
             })
         else:
+            error_msg = result.get('error', 'Error desconocido durante el procesamiento')
+            logger.error(f"Error en procesamiento: {error_msg}")
             return jsonify({
                 'success': False,
-                'error': result.get('error', 'Error desconocido durante el procesamiento')
+                'error': error_msg
             }), 500
             
     except Exception as e:
