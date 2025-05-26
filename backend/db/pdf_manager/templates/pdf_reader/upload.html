@@ -426,10 +426,41 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = '0%';
         progressInfo.textContent = 'Subiendo archivo...';
         
-        // Enviar archivo con fetch
-        fetch(AppConfig.getFullPath('upload-pdf'), {
+        // Paso 1: Subir archivo de forma asíncrona
+        fetch(AppConfig.getFullPath('upload-pdf-async'), {
             method: 'POST',
             body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                progressInfo.textContent = 'Archivo subido, iniciando procesamiento...';
+                // Paso 2: Iniciar procesamiento en background
+                return startBackgroundProcessing();
+            } else {
+                throw new Error(data.error || 'Error al subir archivo');
+            }
+        })
+        .catch(error => {
+            showError(`Error: ${error.message}`);
+            console.error('Error completo:', error);
+            progressContainer.style.display = 'none';
+            submitBtn.disabled = false;
+        });
+        
+        // Iniciar consulta periódica de progreso
+        checkProgress();
+    }
+
+    // Función para iniciar procesamiento en background
+    function startBackgroundProcessing() {
+        return fetch(AppConfig.getFullPath('process-pdf-background'), {
+            method: 'POST'
         })
         .then(response => {
             if (!response.ok) {
@@ -442,20 +473,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 showSuccess(`PDF procesado: ${data.pdf_name} (${data.pages} páginas)`);
                 resetFileInput();
             } else {
-                showError(data.error || 'Error desconocido');
+                throw new Error(data.error || 'Error en procesamiento');
             }
-        })
-        .catch(error => {
-            showError(`Error: ${error.message}`);
-            console.error('Error completo:', error);
         })
         .finally(() => {
             progressContainer.style.display = 'none';
             submitBtn.disabled = false;
         });
-        
-        // Iniciar consulta periódica de progreso
-        checkProgress();
     }
 
     // Función para consultar el progreso
@@ -477,6 +501,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Consultar nuevamente en 500ms
                     setTimeout(checkProgress, 500);
+                } else if (progress.status === 'queued') {
+                    progressInfo.textContent = 'PDF en cola para procesamiento...';
+                    setTimeout(checkProgress, 1000);
+                } else if (progress.status === 'completed') {
+                    progressBar.style.width = '100%';
+                    progressInfo.textContent = 'Procesamiento completado';
+                } else if (progress.status === 'error') {
+                    showError(`Error en procesamiento: ${progress.error || 'Error desconocido'}`);
+                    progressContainer.style.display = 'none';
+                    submitBtn.disabled = false;
                 }
             })
             .catch(error => {

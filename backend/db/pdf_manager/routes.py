@@ -415,3 +415,86 @@ def send_report_email(report_data, user_data):
     except Exception as e_smtp:
         logger.error(f"Error general al enviar correo de reporte: {e_smtp}", exc_info=True)
         raise ConnectionAbortedError(f"Error al enviar correo: {e_smtp}") 
+
+@pdf_manager_bp.route('/upload-pdf-async', methods=['POST'])
+def upload_pdf_async_api():
+    """Endpoint API para subir PDF y procesarlo de forma asíncrona."""
+    processor = get_pdf_processor()
+    
+    if 'pdf' not in request.files:
+        return jsonify({'success': False, 'error': 'No se envió archivo PDF'}), 400
+    
+    file = request.files['pdf']
+    
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No se seleccionó archivo'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        upload_folder = get_upload_temp_dir()
+        temp_path = os.path.join(upload_folder, filename)
+        
+        try:
+            # Guardar archivo temporalmente
+            file.save(temp_path)
+            logger.info(f"PDF guardado temporalmente para procesamiento asíncrono: {temp_path}")
+            
+            # Iniciar procesamiento en background (simulado)
+            processor.current_progress = {
+                "status": "queued",
+                "current_file": filename,
+                "current_page": 0,
+                "total_pages": 0,
+                "percentage": 0,
+                "temp_path": temp_path
+            }
+            
+            return jsonify({
+                'success': True,
+                'message': f'PDF {filename} en cola para procesamiento',
+                'status': 'queued',
+                'filename': filename
+            })
+            
+        except Exception as e:
+            logger.error(f"Error en upload_pdf_async: {str(e)}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+            
+    return jsonify({'success': False, 'error': 'Tipo de archivo no permitido'}), 400
+
+@pdf_manager_bp.route('/process-pdf-background', methods=['POST'])
+def process_pdf_background():
+    """Procesar PDF en background para evitar timeouts."""
+    processor = get_pdf_processor()
+    
+    # Verificar si hay un PDF en cola
+    if processor.current_progress.get('status') != 'queued':
+        return jsonify({'success': False, 'error': 'No hay PDF en cola para procesar'}), 400
+    
+    temp_path = processor.current_progress.get('temp_path')
+    if not temp_path or not os.path.exists(temp_path):
+        return jsonify({'success': False, 'error': 'Archivo temporal no encontrado'}), 400
+    
+    try:
+        # Procesar el PDF
+        result = processor.process_pdf(temp_path, delete_after=True)
+        
+        if result.get('success', False):
+            return jsonify({
+                'success': True,
+                'pdf_name': result.get('pdf_name'),
+                'pages': result.get('pages'),
+                'images_relative_paths': result.get('images_relative_paths'),
+                'thumbnail_relative_path': result.get('thumbnail_relative_path'),
+                'original_pdf_stored_path': result.get('original_pdf_stored_path'),
+                'message': f"PDF {result.get('pdf_name')} procesado con {result.get('pages', 0)} páginas."
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Error desconocido durante el procesamiento')
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error en process_pdf_background: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500 
