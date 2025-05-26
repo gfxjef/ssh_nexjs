@@ -3,7 +3,8 @@ import multiprocessing
 import os
 
 # Configuración del servidor
-bind = "0.0.0.0:8000"
+port = os.getenv('PORT', '8000')
+bind = f"0.0.0.0:{port}"
 workers = 1  # Reducir workers para evitar problemas de memoria en Render
 worker_class = "sync"
 
