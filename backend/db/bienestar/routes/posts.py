@@ -722,17 +722,18 @@ def upload_image():
         import os
         
         # Intentar diferentes rutas para encontrar el directorio correcto
+        # IMPORTANTE: Usar las mismas rutas que el endpoint de servir archivos
         possible_paths = [
-            # Ruta relativa desde este archivo
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts'),
-            # Ruta desde el directorio backend
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'uploads', 'posts'),
-            # Ruta absoluta en Render
+            # Ruta absoluta en Render (prioridad)
             '/opt/render/project/src/uploads/posts',
             # Ruta en el directorio actual de trabajo
             os.path.join(os.getcwd(), 'uploads', 'posts'),
             # Ruta en el directorio backend desde cwd
-            os.path.join(os.getcwd(), 'backend', 'uploads', 'posts')
+            os.path.join(os.getcwd(), 'backend', 'uploads', 'posts'),
+            # Ruta relativa desde este archivo
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts'),
+            # Ruta desde el directorio backend
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'uploads', 'posts')
         ]
         
         upload_dir = None
