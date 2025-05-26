@@ -720,9 +720,40 @@ def upload_image():
         
         # Crear directorio de uploads si no existe
         import os
-        upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts')
-        print(f"DEBUG: Directorio de uploads: {upload_dir}")
-        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Intentar diferentes rutas para encontrar el directorio correcto
+        possible_paths = [
+            # Ruta relativa desde este archivo
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts'),
+            # Ruta desde el directorio backend
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'uploads', 'posts'),
+            # Ruta absoluta en Render
+            '/opt/render/project/src/uploads/posts',
+            # Ruta en el directorio actual de trabajo
+            os.path.join(os.getcwd(), 'uploads', 'posts'),
+            # Ruta en el directorio backend desde cwd
+            os.path.join(os.getcwd(), 'backend', 'uploads', 'posts')
+        ]
+        
+        upload_dir = None
+        for path in possible_paths:
+            print(f"DEBUG: Probando ruta: {path}")
+            try:
+                os.makedirs(path, exist_ok=True)
+                if os.path.exists(path):
+                    upload_dir = path
+                    print(f"DEBUG: Ruta exitosa: {upload_dir}")
+                    break
+            except Exception as e:
+                print(f"DEBUG: Error con ruta {path}: {e}")
+                continue
+        
+        if not upload_dir:
+            # Si ninguna ruta funciona, usar la primera como fallback
+            upload_dir = possible_paths[0]
+            os.makedirs(upload_dir, exist_ok=True)
+            
+        print(f"DEBUG: Directorio final de uploads: {upload_dir}")
         print(f"DEBUG: Directorio creado/verificado: {os.path.exists(upload_dir)}")
         
         # Generar nombre único para el archivo

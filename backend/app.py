@@ -267,8 +267,23 @@ def serve_uploaded_file(filename):
         import os
         from flask import send_from_directory
         
-        # Construir la ruta al directorio de uploads
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        # Construir la ruta al directorio de uploads - intentar diferentes ubicaciones
+        possible_upload_dirs = [
+            os.path.join(os.path.dirname(__file__), 'uploads'),
+            '/opt/render/project/src/uploads',
+            os.path.join(os.getcwd(), 'uploads'),
+            os.path.join(os.getcwd(), 'backend', 'uploads')
+        ]
+        
+        upload_dir = None
+        for dir_path in possible_upload_dirs:
+            if os.path.exists(dir_path):
+                upload_dir = dir_path
+                print(f"DEBUG: Usando directorio uploads: {upload_dir}")
+                break
+        
+        if not upload_dir:
+            upload_dir = possible_upload_dirs[0]  # Fallback a la primera opción
         
         # Construir la ruta completa del archivo (incluyendo subdirectorios)
         file_path = os.path.join(upload_dir, filename)
