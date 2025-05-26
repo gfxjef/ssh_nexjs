@@ -257,6 +257,31 @@ def list_usuarios():
         'usuarios': usuarios
     })
 
+# Endpoint para servir archivos estáticos (imágenes)
+@app.route('/uploads/<path:filename>')
+def serve_uploaded_file(filename):
+    """
+    Sirve archivos estáticos desde el directorio uploads
+    """
+    try:
+        import os
+        from flask import send_from_directory
+        
+        # Construir la ruta al directorio de uploads
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        
+        # Verificar que el archivo existe
+        file_path = os.path.join(upload_dir, filename)
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Archivo no encontrado'}), 404
+        
+        # Servir el archivo
+        return send_from_directory(upload_dir, filename)
+        
+    except Exception as e:
+        print(f"Error al servir archivo {filename}: {str(e)}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
 # Run the app
 if __name__ == '__main__':
     from dotenv import load_dotenv

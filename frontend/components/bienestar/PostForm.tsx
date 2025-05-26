@@ -149,7 +149,14 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
     formData.append('image', file);
     try {
       setLoading(true);
-      const response = await fetch('/api/images/upload', { method: 'POST', body: formData });
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const response = await fetch(`${baseUrl}/api/bienestar/posts/upload-image`, { 
+        method: 'POST', 
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: response.statusText }));
         throw new Error(error.error || 'Error al subir la imagen');
@@ -179,9 +186,13 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const response = await fetch('/api/images/upload', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const response = await fetch(`${baseUrl}/api/bienestar/posts/upload-image`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: response.statusText }));

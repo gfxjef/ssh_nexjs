@@ -685,3 +685,66 @@ def get_postulantes_del_post(post_id):
             'error': f'Error interno del servidor: {str(e)}',
             'details': error_details
         }), 500 
+
+@bienestar_bp.route('/posts/upload-image', methods=['POST'])
+def upload_image():
+    """
+    Endpoint para subir imágenes para posts.
+    Guarda las imágenes en el directorio de uploads del backend.
+    """
+    try:
+        # Verificar token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': 'Token de autorización requerido'}), 401
+        
+        token = auth_header.split(' ')[1]
+        payload = verificar_token(token)
+        if not payload:
+            return jsonify({'success': False, 'error': 'Token inválido'}), 401
+        
+        # Verificar que se envió un archivo
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'No se encontró ninguna imagen'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
+        
+        # Validar tipo de archivo
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_extension not in allowed_extensions:
+            return jsonify({'success': False, 'error': 'Tipo de archivo no permitido. Use: PNG, JPG, JPEG, GIF, WEBP'}), 400
+        
+        # Crear directorio de uploads si no existe
+        import os
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generar nombre único para el archivo
+        import uuid
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"post_image_{timestamp}_{unique_id}.{file_extension}"
+        
+        # Guardar archivo
+        file_path = os.path.join(upload_dir, filename)
+        file.save(file_path)
+        
+        # Generar URL pública
+        # En producción, esto debería apuntar al dominio correcto
+        base_url = request.host_url.rstrip('/')
+        public_url = f"{base_url}/uploads/posts/{filename}"
+        
+        return jsonify({
+            'success': True,
+            'url': public_url,
+            'filename': filename
+        })
+        
+    except Exception as e:
+        print(f"Error al subir imagen: {str(e)}")
+        return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
