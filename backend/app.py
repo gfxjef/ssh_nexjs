@@ -270,13 +270,32 @@ def serve_uploaded_file(filename):
         # Construir la ruta al directorio de uploads
         upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
         
-        # Verificar que el archivo existe
+        # Construir la ruta completa del archivo (incluyendo subdirectorios)
         file_path = os.path.join(upload_dir, filename)
+        
+        # Verificar que el archivo existe
         if not os.path.exists(file_path):
+            print(f"Archivo no encontrado: {file_path}")
+            print(f"Directorio uploads existe: {os.path.exists(upload_dir)}")
+            if os.path.exists(upload_dir):
+                print(f"Contenido del directorio uploads: {os.listdir(upload_dir)}")
+                posts_dir = os.path.join(upload_dir, 'posts')
+                if os.path.exists(posts_dir):
+                    print(f"Contenido del directorio posts: {os.listdir(posts_dir)}")
             return jsonify({'error': 'Archivo no encontrado'}), 404
         
-        # Servir el archivo
-        return send_from_directory(upload_dir, filename)
+        # Obtener el directorio padre del archivo y el nombre del archivo
+        file_dir = os.path.dirname(filename)
+        file_name = os.path.basename(filename)
+        
+        # Si hay subdirectorio, construir la ruta completa
+        if file_dir:
+            serve_dir = os.path.join(upload_dir, file_dir)
+        else:
+            serve_dir = upload_dir
+            
+        # Servir el archivo desde el directorio correcto
+        return send_from_directory(serve_dir, file_name)
         
     except Exception as e:
         print(f"Error al servir archivo {filename}: {str(e)}")

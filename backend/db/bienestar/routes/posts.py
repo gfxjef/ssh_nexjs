@@ -721,7 +721,9 @@ def upload_image():
         # Crear directorio de uploads si no existe
         import os
         upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts')
+        print(f"DEBUG: Directorio de uploads: {upload_dir}")
         os.makedirs(upload_dir, exist_ok=True)
+        print(f"DEBUG: Directorio creado/verificado: {os.path.exists(upload_dir)}")
         
         # Generar nombre único para el archivo
         import uuid
@@ -729,15 +731,19 @@ def upload_image():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         unique_id = str(uuid.uuid4())[:8]
         filename = f"post_image_{timestamp}_{unique_id}.{file_extension}"
+        print(f"DEBUG: Nombre de archivo generado: {filename}")
         
         # Guardar archivo
         file_path = os.path.join(upload_dir, filename)
+        print(f"DEBUG: Ruta completa del archivo: {file_path}")
         file.save(file_path)
+        print(f"DEBUG: Archivo guardado exitosamente: {os.path.exists(file_path)}")
         
         # Generar URL pública
         # En producción, esto debería apuntar al dominio correcto
         base_url = request.host_url.rstrip('/')
         public_url = f"{base_url}/uploads/posts/{filename}"
+        print(f"DEBUG: URL pública generada: {public_url}")
         
         return jsonify({
             'success': True,
