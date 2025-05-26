@@ -132,9 +132,10 @@ export default function Catalogos() {
     }
   };
   
-  // Función para compartir un catálogo (actualizada para el visualizador del backend)
+  // Función para compartir un catálogo (usando rutas del frontend que redirigen al backend)
   const compartirCatalogo = (catalogo: CatalogoFromAPI) => {
-    const urlCompartir = `${BACKEND_BASE_URL}/api/pdfs/?pdf=${encodeURIComponent(catalogo.name)}`;
+    // Usar la ruta del frontend que redirige al backend
+    const urlCompartir = `${window.location.origin}/api/pdfs?pdf=${encodeURIComponent(catalogo.name)}`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(urlCompartir)
@@ -152,7 +153,8 @@ export default function Catalogos() {
 
   // Función para ver el PDF en el visualizador del backend
   const verPdf = (catalogo: CatalogoFromAPI) => {
-    const viewerUrl = `${BACKEND_BASE_URL}/api/pdfs/?pdf=${encodeURIComponent(catalogo.name)}`;
+    // Usar la ruta del frontend que redirige al backend
+    const viewerUrl = `${window.location.origin}/api/pdfs?pdf=${encodeURIComponent(catalogo.name)}`;
     window.open(viewerUrl, '_blank'); // Abre en una nueva pestaña
   };
 
@@ -224,9 +226,10 @@ export default function Catalogos() {
     alert("Se abrirá la página de subida en una nueva pestaña. Sube el nuevo PDF con el MISMO NOMBRE para reemplazar el existente: " + catalogo.name);
   };
   
-  // Función para compartir el visualizador general (ahora es la página de catálogo del backend)
+  // Función para compartir el visualizador general (usando ruta del frontend que redirige al backend)
   const compartirVisualizadorGeneral = () => {
-    const urlVisualizador = `${BACKEND_BASE_URL}/api/pdfs/catalogo`;
+    // Usar la ruta del frontend que redirige al backend
+    const urlVisualizador = `${window.location.origin}/api/pdfs/catalogo`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(urlVisualizador)
