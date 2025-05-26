@@ -89,44 +89,45 @@ class PDFProcessor:
                 for i in range(batch_start, batch_end):
                     page = doc.load_page(i)
 
-                # --- OPTIMIZACIÓN PARA MEMORIA: ANCHO REDUCIDO ---
-                # Reducir resolución para ahorrar memoria en Render
-                target_width_px = 1200  # Reducido de 2000 a 1200
-                original_rect = page.rect  # Obtiene el rectángulo de la página (x0, y0, x1, y1)
-                original_width_points = original_rect.width
+                    # --- OPTIMIZACIÓN PARA MEMORIA: ANCHO REDUCIDO ---
+                    # Reducir resolución para ahorrar memoria en Render
+                    target_width_px = 1200  # Reducido de 2000 a 1200
+                    original_rect = page.rect  # Obtiene el rectángulo de la página (x0, y0, x1, y1)
+                    original_width_points = original_rect.width
 
-                if original_width_points == 0: # Evitar división por cero
-                    zoom_x = 1.0 
-                else:
-                    zoom_x = target_width_px / original_width_points
-                
-                zoom_y = zoom_x # Mantener proporción
+                    if original_width_points == 0: # Evitar división por cero
+                        zoom_x = 1.0 
+                    else:
+                        zoom_x = target_width_px / original_width_points
+                    
+                    zoom_y = zoom_x # Mantener proporción
 
-                matrix = fitz.Matrix(zoom_x, zoom_y)
-                # alpha=False para reducir uso de memoria
-                pix = page.get_pixmap(matrix=matrix, alpha=False) 
-                # --- FIN DE OPTIMIZACIÓN PARA MEMORIA ---
-                
-                mode = "RGB" # Si alpha=False, el modo debería ser RGB
-                if pix.alpha:
-                    logger.warning(f"Pixmap para la página {i+1} de {pdf_filename} inesperadamente tiene canal alfa a pesar de alpha=False.")
-                    mode = "RGBA" # Fallback si acaso
-                
-                img = Image.frombytes(mode, (pix.width, pix.height), pix.samples)
-                
-                webp_filename = f"page_{i+1}.webp"
-                webp_full_path = os.path.join(pdf_output_dir, webp_filename)
-                
-                # Optimización: usar compresión con pérdida para ahorrar memoria y espacio
-                img.save(webp_full_path, "WEBP", quality=85, method=6) # quality=85, method=6 para mejor compresión
-                
-                # Liberar memoria inmediatamente
-                img.close()
-                pix = None  # Liberar pixmap
-                
-                # Guardar ruta relativa para la respuesta JSON y uso en el frontend
-                generated_images_relative_paths.append(os.path.join(pdf_name_without_ext, webp_filename))
-                
+                    matrix = fitz.Matrix(zoom_x, zoom_y)
+                    # alpha=False para reducir uso de memoria
+                    pix = page.get_pixmap(matrix=matrix, alpha=False) 
+                    # --- FIN DE OPTIMIZACIÓN PARA MEMORIA ---
+                    
+                    mode = "RGB" # Si alpha=False, el modo debería ser RGB
+                    if pix.alpha:
+                        logger.warning(f"Pixmap para la página {i+1} de {pdf_filename} inesperadamente tiene canal alfa a pesar de alpha=False.")
+                        mode = "RGBA" # Fallback si acaso
+                    
+                    img = Image.frombytes(mode, (pix.width, pix.height), pix.samples)
+                    
+                    webp_filename = f"page_{i+1}.webp"
+                    webp_full_path = os.path.join(pdf_output_dir, webp_filename)
+                    
+                    # Optimización: usar compresión con pérdida para ahorrar memoria y espacio
+                    img.save(webp_full_path, "WEBP", quality=85, method=6) # quality=85, method=6 para mejor compresión
+                    
+                    # Liberar memoria inmediatamente
+                    img.close()
+                    pix = None  # Liberar pixmap
+                    
+                    # Guardar ruta relativa para la respuesta JSON y uso en el frontend
+                    generated_images_relative_paths.append(os.path.join(pdf_name_without_ext, webp_filename))
+                    
+                    # Actualizar progreso
                     self.current_progress["current_page"] = i + 1
                     self.current_progress["percentage"] = int(((i + 1) / total_pages) * 100)
                     if (i + 1) % 5 == 0 or (i+1) == total_pages : # Loguear cada 5 pags o la ultima
