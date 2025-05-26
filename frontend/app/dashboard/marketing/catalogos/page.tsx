@@ -136,17 +136,50 @@ export default function Catalogos() {
   const compartirCatalogo = (catalogo: CatalogoFromAPI) => {
     const urlCompartir = `${BACKEND_BASE_URL}/api/pdfs/?pdf=${encodeURIComponent(catalogo.name)}`;
     
-    if (navigator.clipboard) {
+    // Función de fallback para copiar texto en navegadores sin soporte de clipboard API
+    const fallbackCopyTextToClipboard = (text: string) => {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Evitar scroll al fondo de la página en iOS
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          alert('Enlace para ver el PDF copiado al portapapeles!');
+        } else {
+          alert('No se pudo copiar el enlace automáticamente. URL: ' + text);
+        }
+      } catch (err) {
+        console.error('Error al copiar con fallback:', err);
+        alert('No se pudo copiar el enlace automáticamente. URL: ' + text);
+      }
+      
+      document.body.removeChild(textArea);
+    };
+    
+    // Intentar usar la API moderna de clipboard primero
+    if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(urlCompartir)
         .then(() => {
           alert('Enlace para ver el PDF copiado al portapapeles!');
         })
         .catch(err => {
-          console.error('Error al copiar enlace:', err);
-          alert('No se pudo copiar el enlace automáticamente. URL: ' + urlCompartir);
+          console.error('Error al copiar enlace con clipboard API:', err);
+          // Usar fallback si falla la API moderna
+          fallbackCopyTextToClipboard(urlCompartir);
         });
     } else {
-      alert('No se pudo copiar el enlace automáticamente. URL: ' + urlCompartir);
+      // Usar fallback directamente si no hay soporte para clipboard API
+      fallbackCopyTextToClipboard(urlCompartir);
     }
   };
 
@@ -228,17 +261,47 @@ export default function Catalogos() {
   const compartirVisualizadorGeneral = () => {
     const urlVisualizador = `${BACKEND_BASE_URL}/api/pdfs/catalogo`;
     
-    if (navigator.clipboard) {
+    // Función de fallback para copiar texto
+    const fallbackCopyTextToClipboard = (text: string) => {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          alert('Enlace de la página de catálogos copiado al portapapeles');
+        } else {
+          alert('No se pudo copiar el enlace automáticamente. URL: ' + text);
+        }
+      } catch (err) {
+        console.error('Error al copiar con fallback:', err);
+        alert('No se pudo copiar el enlace automáticamente. URL: ' + text);
+      }
+      
+      document.body.removeChild(textArea);
+    };
+    
+    // Intentar usar la API moderna de clipboard primero
+    if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(urlVisualizador)
         .then(() => {
           alert('Enlace de la página de catálogos copiado al portapapeles');
         })
         .catch(err => {
-          console.error('Error al copiar enlace:', err);
-          alert('No se pudo copiar el enlace automáticamente. URL: ' + urlVisualizador);
+          console.error('Error al copiar enlace con clipboard API:', err);
+          fallbackCopyTextToClipboard(urlVisualizador);
         });
     } else {
-      alert('No se pudo copiar el enlace automáticamente. URL: ' + urlVisualizador);
+      // Usar fallback directamente
+      fallbackCopyTextToClipboard(urlVisualizador);
     }
   };
   
