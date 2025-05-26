@@ -6,7 +6,7 @@
 import { Document, DocumentCategory, DocumentTag, DocumentFilters, DocumentGroup } from '../types';
 
 // Configuración base de la API
-const API_BASE_URL = 'http://localhost:3001/api/bienestar/documentos';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'}/api/bienestar/documentos`;
 
 // Función para obtener el token de autorización
 const getAuthToken = (): string | null => {

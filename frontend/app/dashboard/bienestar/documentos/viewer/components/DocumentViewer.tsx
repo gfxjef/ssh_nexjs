@@ -25,7 +25,8 @@ export default function DocumentViewer({ document, onDownload }: DocumentViewerP
     const filename = document.ruta_archivo.split('/').pop();
     
     // Usar el endpoint del backend que maneja archivos correctamente
-    const finalUrl = `http://localhost:3001/api/bienestar/documentos/files/${encodeURIComponent(filename || '')}`;
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+    const finalUrl = `${baseUrl}/api/bienestar/documentos/files/${encodeURIComponent(filename || '')}`;
     
     console.log(`🔗 [URL DEBUG] Extracted filename: '${filename}'`);
     console.log(`🔗 [URL DEBUG] Final URL (backend): ${finalUrl}`);

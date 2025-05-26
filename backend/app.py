@@ -31,7 +31,12 @@ CORS(
     app, 
     resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000", "*"],  # Permitir localhost:3000 y fallback a todos
+            "origins": [
+                "http://localhost:3000", 
+                "http://localhost:5000",
+                "http://www.grupokossodo.com:5000",
+                "*"
+            ],  # Permitir localhost y dominio de producción
             "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
         }

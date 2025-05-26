@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
     
-    const backendResponse = await fetch('http://localhost:3001/api/bienestar/documentos/upload', {
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+    const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/upload`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

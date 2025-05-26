@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     
     // Probar token con el backend
     try {
-      const backendResponse = await fetch('http://localhost:3001/api/bienestar/documentos/categorias', {
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/categorias`, {
         method: 'GET',
         headers: {
           'Authorization': authHeader
