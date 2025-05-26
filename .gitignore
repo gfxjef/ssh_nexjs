@@ -42,12 +42,24 @@ __pycache__/
 tasks.json
 tasks/
 
+# Archivos subidos por usuarios (no incluir en el repositorio)
 # Frontend uploads
-frontend/public/uploads/posts/
+frontend/public/uploads/
+frontend/public/uploads/**/*
 
-# Backend uploads
+# Backend uploads - todas las carpetas de uploads
 backend/uploads/
-backend/uploads/documentos/
+backend/uploads/**/*
+backend/db/uploads/
+backend/db/uploads/**/*
 
-# Backend specific files
-backend/db/pdf_manager/pdf_files/ 
+# Uploads en la raíz del proyecto
+uploads/
+uploads/**/*
+
+# Archivos específicos de módulos
+backend/db/pdf_manager/pdf_files/
+backend/db/pdf_manager/pdf_files/**/*
+
+# Mantener solo los archivos .gitkeep para la estructura
+!**/.gitkeep 
