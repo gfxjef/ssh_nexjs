@@ -79,26 +79,33 @@ class PDFProcessor:
             generated_images_relative_paths = []
             thumbnail_relative_path = None
 
-            for i in range(total_pages):
-                page = doc.load_page(i)
+            # Procesar en lotes para reducir uso de memoria
+            batch_size = 5  # Procesar 5 páginas a la vez
+            
+            for batch_start in range(0, total_pages, batch_size):
+                batch_end = min(batch_start + batch_size, total_pages)
+                logger.info(f"Procesando lote {batch_start+1}-{batch_end} de {total_pages} páginas")
+                
+                for i in range(batch_start, batch_end):
+                    page = doc.load_page(i)
 
-                # --- INICIO DE CAMBIOS PARA ANCHO FIJO ---
-                target_width_px = 2000
+                # --- OPTIMIZACIÓN PARA MEMORIA: ANCHO REDUCIDO ---
+                # Reducir resolución para ahorrar memoria en Render
+                target_width_px = 1200  # Reducido de 2000 a 1200
                 original_rect = page.rect  # Obtiene el rectángulo de la página (x0, y0, x1, y1)
                 original_width_points = original_rect.width
-                # original_height_points = original_rect.height # No se usa directamente para calcular zoom_x
 
                 if original_width_points == 0: # Evitar división por cero
                     zoom_x = 1.0 
                 else:
                     zoom_x = target_width_px / original_width_points
                 
-                zoom_y = zoom_x # Mantener proporción, así que el zoom es igual en ambas direcciones
+                zoom_y = zoom_x # Mantener proporción
 
                 matrix = fitz.Matrix(zoom_x, zoom_y)
-                # alpha=False puede ayudar si no necesitas transparencia y optimizar un poco
+                # alpha=False para reducir uso de memoria
                 pix = page.get_pixmap(matrix=matrix, alpha=False) 
-                # --- FIN DE CAMBIOS PARA ANCHO FIJO ---
+                # --- FIN DE OPTIMIZACIÓN PARA MEMORIA ---
                 
                 mode = "RGB" # Si alpha=False, el modo debería ser RGB
                 if pix.alpha:
@@ -109,15 +116,27 @@ class PDFProcessor:
                 
                 webp_filename = f"page_{i+1}.webp"
                 webp_full_path = os.path.join(pdf_output_dir, webp_filename)
-                img.save(webp_full_path, "WEBP", lossless=True) # Mantener lossless=True
+                
+                # Optimización: usar compresión con pérdida para ahorrar memoria y espacio
+                img.save(webp_full_path, "WEBP", quality=85, method=6) # quality=85, method=6 para mejor compresión
+                
+                # Liberar memoria inmediatamente
+                img.close()
+                pix = None  # Liberar pixmap
                 
                 # Guardar ruta relativa para la respuesta JSON y uso en el frontend
                 generated_images_relative_paths.append(os.path.join(pdf_name_without_ext, webp_filename))
                 
-                self.current_progress["current_page"] = i + 1
-                self.current_progress["percentage"] = int(((i + 1) / total_pages) * 100)
-                if (i + 1) % 10 == 0 or (i+1) == total_pages : # Loguear cada 10 pags o la ultima
-                    logger.info(f"Procesada página {i+1} de {total_pages} para {pdf_filename}")
+                    self.current_progress["current_page"] = i + 1
+                    self.current_progress["percentage"] = int(((i + 1) / total_pages) * 100)
+                    if (i + 1) % 5 == 0 or (i+1) == total_pages : # Loguear cada 5 pags o la ultima
+                        logger.info(f"Procesada página {i+1} de {total_pages} para {pdf_filename}")
+                
+                # Forzar liberación de memoria entre lotes
+                if batch_end < total_pages:
+                    import gc
+                    gc.collect()
+                    logger.info(f"Memoria liberada después del lote {batch_start+1}-{batch_end}")
             
             doc.close()
 
@@ -183,8 +202,8 @@ class PDFProcessor:
         try:
             img = Image.open(image_full_path) # image_full_path es la page_1.webp (ahora de 2000px de ancho)
             
-            # --- INICIO DE CAMBIOS PARA ANCHO FIJO DE MINIATURA ---
-            target_thumb_width = 500
+            # --- OPTIMIZACIÓN: MINIATURA MÁS PEQUEÑA ---
+            target_thumb_width = 300  # Reducido de 500 a 300
             original_width, original_height = img.size
 
             if original_width == 0: # Evitar división por cero
@@ -211,7 +230,7 @@ class PDFProcessor:
             thumbnail_filename = f"thumb_{pdf_name_prefix}.webp"
             thumbnail_full_path = os.path.join(pdf_output_dir, thumbnail_filename)
             # Guardar la imagen redimensionada con lossless=True
-            img_resized.save(thumbnail_full_path, "WEBP", lossless=True)
+            img_resized.save(thumbnail_full_path, "WEBP", quality=80, method=6)  # Compresión optimizada
             
             logger.info(f"Miniatura creada con ancho {target_thumb_width}px: {thumbnail_full_path}")
             return thumbnail_full_path
