@@ -35,10 +35,11 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 def get_upload_dir():
-    """Obtiene la carpeta de subida de documentos."""
-    upload_dir = os.path.join(current_app.root_path, 'uploads', 'documentos')
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+    """Obtiene la carpeta de subida de documentos (sistema centralizado)."""
+    from ...utils.upload_utils import UploadManager, UploadType
+    
+    # Usar sistema centralizado
+    upload_dir = UploadManager.ensure_upload_directory(UploadType.DOCUMENTOS)
     return upload_dir
 
 def allowed_file(filename):
@@ -245,12 +246,9 @@ def upload_document():
             
             logger.info(f"Documento guardado en BD - ID: {documento_id}, Título: {titulo}, Ruta: {ruta_archivo}")
             
-            # Copiar archivo desde frontend a backend automáticamente
-            copy_success = copy_file_to_backend(ruta_archivo)
-            if copy_success:
-                logger.info(f"📁 Archivo copiado automáticamente para acceso backend")
-            else:
-                logger.warning(f"⚠️ Warning: no se pudo copiar archivo automáticamente")
+            # El archivo ya está en el sistema centralizado frontend/public/uploads/
+            # No necesitamos copiar, el sistema centralizado maneja todo
+            logger.info(f"📁 Archivo registrado en sistema centralizado: {ruta_archivo}")
             
             return jsonify({
                 'success': True,
@@ -300,9 +298,19 @@ def download_document(documento_id):
         if doc_data['estado'] != 'activo':
             return jsonify({'success': False, 'error': 'Documento no disponible'}), 403
         
-        # Verificar que el archivo existe
-        upload_dir = get_upload_dir()
-        file_path = os.path.join(upload_dir, doc_data['nombre_archivo'])
+        # Verificar que el archivo existe en el sistema centralizado
+        from ...utils.upload_utils import UploadManager, UploadType
+        
+        # Construir ruta en sistema centralizado usando la ruta_archivo de BD
+        ruta_archivo = doc_data.get('ruta_archivo', '')
+        if ruta_archivo.startswith('/uploads/'):
+            # Es una ruta centralizada, convertir a ruta física
+            filename = os.path.basename(ruta_archivo)
+            file_path = UploadManager.get_upload_path(UploadType.DOCUMENTOS, filename)
+        else:
+            # Fallback a método legacy
+            upload_dir = get_upload_dir()
+            file_path = os.path.join(upload_dir, doc_data['nombre_archivo'])
         
         if not os.path.exists(file_path):
             return jsonify({'success': False, 'error': 'Archivo no encontrado en el servidor'}), 404
@@ -356,22 +364,33 @@ def serve_file(filename):
         # Decodificar el nombre del archivo desde URL encoding
         decoded_filename = unquote(filename)
         
-        upload_dir = get_upload_dir()
-        file_path = os.path.join(upload_dir, decoded_filename)
+        # Usar sistema centralizado
+        from ...utils.upload_utils import UploadManager, UploadType
         
-        # Log para debug
-        logger.info(f"Intentando servir archivo: '{decoded_filename}' desde '{file_path}'")
+        try:
+            # Primero intentar con sistema centralizado
+            file_path = UploadManager.get_upload_path(UploadType.DOCUMENTOS, decoded_filename)
+            
+            if os.path.exists(file_path):
+                file_dir = os.path.dirname(file_path)
+                file_name = os.path.basename(file_path)
+                logger.info(f"✅ Sirviendo archivo desde sistema centralizado: {file_path}")
+                return send_from_directory(file_dir, file_name, as_attachment=False)
+            
+            # Fallback a sistema legacy
+            upload_dir = get_upload_dir()
+            legacy_file_path = os.path.join(upload_dir, decoded_filename)
+            
+            if os.path.exists(legacy_file_path):
+                logger.info(f"⚠️ Sirviendo archivo desde sistema legacy: {legacy_file_path}")
+                return send_from_directory(upload_dir, decoded_filename, as_attachment=False)
+                
+        except Exception as e:
+            logger.error(f"Error accediendo archivo centralizado: {str(e)}")
         
-        if not os.path.exists(file_path):
-            logger.error(f"Archivo no encontrado: {file_path}")
-            abort(404)
-        
-        # Servir archivo sin forzar descarga (as_attachment=False)
-        return send_from_directory(
-            upload_dir,
-            decoded_filename,
-            as_attachment=False
-        )
+        # Si no se encuentra en ningún sistema
+        logger.error(f"Archivo no encontrado: {decoded_filename}")
+        abort(404)
         
     except Exception as e:
         logger.error(f"Error en serve_file: {str(e)}")

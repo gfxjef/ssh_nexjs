@@ -690,9 +690,15 @@ def get_postulantes_del_post(post_id):
 def upload_image():
     """
     Endpoint para subir imágenes para posts.
-    Guarda las imágenes en el directorio de uploads del backend.
+    Usa el sistema centralizado de uploads.
     """
     try:
+        # Importar nuestro sistema centralizado
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'utils'))
+        from upload_utils import UploadManager, UploadType
+        
         # Verificar token
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
@@ -711,78 +717,61 @@ def upload_image():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
         
-        # Validar tipo de archivo
-        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        # Validar archivo usando el sistema centralizado
+        file_size = len(file.read())
+        file.seek(0)  # Reset file pointer
         
-        if file_extension not in allowed_extensions:
-            return jsonify({'success': False, 'error': 'Tipo de archivo no permitido. Use: PNG, JPG, JPEG, GIF, WEBP'}), 400
+        # Detectar MIME type
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(file.filename)
+        if not mime_type:
+            mime_type = file.content_type or 'application/octet-stream'
         
-        # Crear directorio de uploads si no existe
-        import os
+        # Validar con UploadManager
+        is_valid, error_msg = UploadManager.validate_file(
+            file_size=file_size,
+            filename=file.filename,
+            mime_type=mime_type,
+            upload_type=UploadType.POSTS
+        )
         
-        # Intentar diferentes rutas para encontrar el directorio correcto
-        # IMPORTANTE: Usar las mismas rutas que el endpoint de servir archivos
-        possible_paths = [
-            # Ruta absoluta en Render (prioridad)
-            '/opt/render/project/src/uploads/posts',
-            # Ruta en el directorio actual de trabajo
-            os.path.join(os.getcwd(), 'uploads', 'posts'),
-            # Ruta en el directorio backend desde cwd
-            os.path.join(os.getcwd(), 'backend', 'uploads', 'posts'),
-            # Ruta relativa desde este archivo
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads', 'posts'),
-            # Ruta desde el directorio backend
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'uploads', 'posts')
-        ]
+        if not is_valid:
+            return jsonify({'success': False, 'error': error_msg}), 400
         
-        upload_dir = None
-        for path in possible_paths:
-            print(f"DEBUG: Probando ruta: {path}")
-            try:
-                os.makedirs(path, exist_ok=True)
-                if os.path.exists(path):
-                    upload_dir = path
-                    print(f"DEBUG: Ruta exitosa: {upload_dir}")
-                    break
-            except Exception as e:
-                print(f"DEBUG: Error con ruta {path}: {e}")
-                continue
-        
-        if not upload_dir:
-            # Si ninguna ruta funciona, usar la primera como fallback
-            upload_dir = possible_paths[0]
-            os.makedirs(upload_dir, exist_ok=True)
-            
-        print(f"DEBUG: Directorio final de uploads: {upload_dir}")
-        print(f"DEBUG: Directorio creado/verificado: {os.path.exists(upload_dir)}")
-        
-        # Generar nombre único para el archivo
-        import uuid
+        # Obtener ruta usando el sistema centralizado
         from datetime import datetime
+        import uuid
+        
+        # Generar nombre único
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'jpg'
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         unique_id = str(uuid.uuid4())[:8]
-        filename = f"post_image_{timestamp}_{unique_id}.{file_extension}"
-        print(f"DEBUG: Nombre de archivo generado: {filename}")
+        unique_filename = f"post_image_{timestamp}_{unique_id}.{file_extension}"
+        
+        # Sanitizar nombre
+        safe_filename = UploadManager.sanitize_filename(unique_filename)
+        
+        # Obtener ruta completa usando sistema centralizado
+        file_path = UploadManager.get_upload_path(UploadType.POSTS, safe_filename)
         
         # Guardar archivo
-        file_path = os.path.join(upload_dir, filename)
-        print(f"DEBUG: Ruta completa del archivo: {file_path}")
         file.save(file_path)
-        print(f"DEBUG: Archivo guardado exitosamente: {os.path.exists(file_path)}")
+        print(f"✅ Imagen guardada en sistema centralizado: {file_path}")
         
-        # Generar URL pública
-        # En producción, esto debería apuntar al dominio correcto
+        # Obtener URL relativa para frontend
+        relative_url = UploadManager.get_relative_path(UploadType.POSTS, safe_filename)
+        
+        # Generar URL completa
         base_url = request.host_url.rstrip('/')
-        public_url = f"{base_url}/uploads/posts/{filename}"
-        print(f"DEBUG: URL pública generada: {public_url}")
+        public_url = f"{base_url}{relative_url}"
         
         return jsonify({
             'success': True,
             'url': public_url,
-            'filename': filename
+            'filename': safe_filename,
+            'relative_path': relative_url
         })
         
     except Exception as e:
-        print(f"Error al subir imagen: {str(e)}")
+        print(f"❌ Error al subir imagen: {str(e)}")
         return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500

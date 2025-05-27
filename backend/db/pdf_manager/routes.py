@@ -108,8 +108,13 @@ def upload_pdf_api():
         return jsonify({'success': False, 'error': 'No se seleccionó archivo'}), 400
     
     if file and allowed_file(file.filename):
+        # Usar sistema centralizado para archivos temporales
+        import sys
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+        from upload_utils import UploadManager, UploadType
+        
         filename = secure_filename(file.filename)
-        upload_folder = get_upload_temp_dir()
+        upload_folder = UploadManager.ensure_upload_directory(UploadType.TEMP)
         temp_path = os.path.join(upload_folder, filename)
         
         try:
@@ -262,29 +267,47 @@ def delete_pdf_api():
 # Ejemplo: /api/pdfs/processed_files/nombre_catalogo/nombre_catalogo.pdf
 @pdf_manager_bp.route('/processed_files/<path:filepath>')
 def serve_processed_pdf_files(filepath):
-    """Sirve los archivos de un PDF procesado (imágenes, el PDF original)."""
+    """Sirve los archivos de un PDF procesado (imágenes, el PDF original) desde sistema centralizado."""
     # filepath será algo como "NombreDelPDF/page_1.webp" o "NombreDelPDF/NombreDelPDF.pdf"
-    # Hay que tener cuidado con la seguridad aquí (path traversal)
-    # secure_filename podría ser demasiado restrictivo para subdirectorios.
-    # Se construye la ruta completa y se verifica que esté dentro del directorio esperado.
     
-    base_processed_dir = get_processed_pdf_base_dir()
+    # Usar sistema centralizado
+    import sys
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+    from upload_utils import UploadManager, UploadType
     
-    # Crear la ruta completa al archivo solicitado
-    requested_file_path = os.path.join(base_processed_dir, filepath)
-    
-    # Medida de seguridad: Normalizar la ruta y verificar que sigue estando dentro del directorio base
-    if not os.path.normpath(requested_file_path).startswith(os.path.normpath(base_processed_dir)):
-        logger.warning(f"Intento de acceso no autorizado a: {filepath}")
-        return jsonify({'error': 'Acceso no autorizado'}), 403
-
-    if not os.path.exists(requested_file_path) or not os.path.isfile(requested_file_path):
-        logger.warning(f"Archivo procesado no encontrado: {requested_file_path}")
-        return jsonify({'error': 'Archivo no encontrado'}), 404
+    try:
+        # Obtener directorio base centralizado para PDFs
+        base_processed_dir = UploadManager.ensure_upload_directory(UploadType.PDF)
         
-    # Extraer el directorio y el nombre del archivo para send_from_directory
-    directory, filename = os.path.split(requested_file_path)
-    return send_from_directory(directory, filename)
+        # Crear la ruta completa al archivo solicitado
+        requested_file_path = os.path.join(base_processed_dir, filepath)
+        
+        # Medida de seguridad: Normalizar la ruta y verificar que sigue estando dentro del directorio base
+        if not os.path.normpath(requested_file_path).startswith(os.path.normpath(base_processed_dir)):
+            logger.warning(f"Intento de acceso no autorizado a: {filepath}")
+            return jsonify({'error': 'Acceso no autorizado'}), 403
+
+        if os.path.exists(requested_file_path) and os.path.isfile(requested_file_path):
+            # Servir desde sistema centralizado
+            directory, filename = os.path.split(requested_file_path)
+            logger.info(f"✅ Sirviendo PDF desde sistema centralizado: {requested_file_path}")
+            return send_from_directory(directory, filename)
+        
+        # Fallback: intentar con sistema legacy
+        legacy_base_dir = get_processed_pdf_base_dir()
+        legacy_file_path = os.path.join(legacy_base_dir, filepath)
+        
+        if os.path.exists(legacy_file_path) and os.path.isfile(legacy_file_path):
+            directory, filename = os.path.split(legacy_file_path)
+            logger.info(f"⚠️ Sirviendo PDF desde sistema legacy: {legacy_file_path}")
+            return send_from_directory(directory, filename)
+            
+    except Exception as e:
+        logger.error(f"Error sirviendo archivo PDF: {str(e)}")
+    
+    # No encontrado en ningún sistema
+    logger.warning(f"Archivo procesado no encontrado: {filepath}")
+    return jsonify({'error': 'Archivo no encontrado'}), 404
 
 
 @pdf_manager_bp.route('/progreso-pdf')

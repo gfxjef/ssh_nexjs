@@ -11,22 +11,34 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PDFProcessor:
-    def __init__(self, base_dir_for_pdfs, base_dir_for_uploads):
+    def __init__(self, base_dir_for_pdfs=None, base_dir_for_uploads=None):
         """
         Inicializa el procesador de PDF.
         Args:
             base_dir_for_pdfs: Directorio donde se guardarán los PDFs procesados (imágenes, etc.).
             base_dir_for_uploads: Directorio para los archivos PDF subidos temporalmente.
         """
-        self.base_dir_for_pdfs = base_dir_for_pdfs
-        self.base_dir_for_uploads = base_dir_for_uploads
+        # Si no se especifica, usar sistema centralizado
+        if base_dir_for_pdfs is None:
+            import sys
+            sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+            from upload_utils import UploadManager, UploadType
+            self.base_dir_for_pdfs = UploadManager.ensure_upload_directory(UploadType.PDF)
+        else:
+            self.base_dir_for_pdfs = base_dir_for_pdfs
+            
+        if base_dir_for_uploads is None:
+            # Usar directorio temp dentro del sistema centralizado
+            self.base_dir_for_uploads = UploadManager.ensure_upload_directory(UploadType.TEMP)
+        else:
+            self.base_dir_for_uploads = base_dir_for_uploads
         
         # Asegurar que los directorios base existan
         os.makedirs(self.base_dir_for_pdfs, exist_ok=True)
         os.makedirs(self.base_dir_for_uploads, exist_ok=True)
         
-        logger.info(f"PDFProcessor: Directorio para PDFs procesados: {self.base_dir_for_pdfs}")
-        logger.info(f"PDFProcessor: Directorio para uploads temporales: {self.base_dir_for_uploads}")
+        logger.info(f"PDFProcessor: Directorio para PDFs procesados (centralizado): {self.base_dir_for_pdfs}")
+        logger.info(f"PDFProcessor: Directorio para uploads temporales (centralizado): {self.base_dir_for_uploads}")
 
         self.current_progress = {
             "status": "idle",

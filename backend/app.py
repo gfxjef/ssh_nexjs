@@ -257,48 +257,53 @@ def list_usuarios():
         'usuarios': usuarios
     })
 
-# Endpoint para servir archivos estáticos (imágenes)
+# Endpoint para servir archivos estáticos (uploads centralizados)
 @app.route('/uploads/<path:filename>')
 def serve_uploaded_file(filename):
     """
-    Sirve archivos estáticos desde el directorio uploads
+    Sirve archivos estáticos desde el sistema centralizado de uploads
     """
     try:
         import os
         from flask import send_from_directory
         
-        # Construir la ruta al directorio de uploads - intentar diferentes ubicaciones
-        # IMPORTANTE: Usar el mismo orden de prioridad que el endpoint de subida
-        possible_upload_dirs = [
+        # Usar el sistema centralizado para obtener la ruta base
+        # Priorizar el directorio centralizado
+        centralized_upload_dir = os.path.join('frontend', 'public', 'uploads')
+        
+        # Verificar si existe en el sistema centralizado
+        centralized_file_path = os.path.join(centralized_upload_dir, filename)
+        
+        if os.path.exists(centralized_file_path):
+            # Servir desde sistema centralizado
+            file_dir = os.path.dirname(centralized_file_path)
+            file_name = os.path.basename(centralized_file_path)
+            print(f"✅ Sirviendo archivo desde sistema centralizado: {centralized_file_path}")
+            return send_from_directory(file_dir, file_name)
+        
+        # Fallback: buscar en directorios legacy para compatibilidad
+        legacy_upload_dirs = [
             '/opt/render/project/src/uploads',
             os.path.join(os.getcwd(), 'uploads'),
             os.path.join(os.getcwd(), 'backend', 'uploads'),
             os.path.join(os.path.dirname(__file__), 'uploads')
         ]
         
-        upload_dir = None
-        for dir_path in possible_upload_dirs:
-            if os.path.exists(dir_path):
-                upload_dir = dir_path
-                print(f"DEBUG: Usando directorio uploads: {upload_dir}")
-                break
-        
-        if not upload_dir:
-            upload_dir = possible_upload_dirs[0]  # Fallback a la primera opción
-        
-        # Construir la ruta completa del archivo (incluyendo subdirectorios)
-        file_path = os.path.join(upload_dir, filename)
-        
-        # Verificar que el archivo existe
-        if not os.path.exists(file_path):
-            print(f"Archivo no encontrado: {file_path}")
-            print(f"Directorio uploads existe: {os.path.exists(upload_dir)}")
+        for upload_dir in legacy_upload_dirs:
             if os.path.exists(upload_dir):
-                print(f"Contenido del directorio uploads: {os.listdir(upload_dir)}")
-                posts_dir = os.path.join(upload_dir, 'posts')
-                if os.path.exists(posts_dir):
-                    print(f"Contenido del directorio posts: {os.listdir(posts_dir)}")
-            return jsonify({'error': 'Archivo no encontrado'}), 404
+                file_path = os.path.join(upload_dir, filename)
+                if os.path.exists(file_path):
+                    file_dir = os.path.dirname(file_path)
+                    file_name = os.path.basename(file_path)
+                    print(f"⚠️ Sirviendo archivo desde sistema legacy: {file_path}")
+                    return send_from_directory(file_dir, file_name)
+        
+        # Archivo no encontrado en ningún sistema
+        print(f"❌ Archivo no encontrado: {filename}")
+        print(f"   Buscado en centralizado: {centralized_file_path}")
+        print(f"   Buscado en legacy: {[os.path.join(d, filename) for d in legacy_upload_dirs if os.path.exists(d)]}")
+        
+        return jsonify({'error': 'Archivo no encontrado'}), 404
         
         # Obtener el directorio padre del archivo y el nombre del archivo
         file_dir = os.path.dirname(filename)
