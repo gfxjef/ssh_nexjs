@@ -23,17 +23,17 @@ class UploadManager:
     # Configuración por tipo de archivo
     UPLOAD_CONFIG = {
         UploadType.POSTS: {
-            "max_size": 5 * 1024 * 1024,  # 5MB
+            "max_size": 10 * 1024 * 1024,  # 10MB (Imágenes)
             "allowed_extensions": {".jpg", ".jpeg", ".png", ".webp", ".gif"},
             "allowed_mimes": {"image/jpeg", "image/png", "image/webp", "image/gif"}
         },
         UploadType.PDF: {
-            "max_size": 10 * 1024 * 1024,  # 10MB
+            "max_size": 30 * 1024 * 1024,  # 30MB (PDFs)
             "allowed_extensions": {".pdf"},
             "allowed_mimes": {"application/pdf"}
         },
         UploadType.DOCUMENTOS: {
-            "max_size": 15 * 1024 * 1024,  # 15MB
+            "max_size": 20 * 1024 * 1024,  # 20MB (Documentos)
             "allowed_extensions": {".pdf", ".doc", ".docx", ".xls", ".xlsx"},
             "allowed_mimes": {
                 "application/pdf", 

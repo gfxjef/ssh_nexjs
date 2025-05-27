@@ -30,19 +30,19 @@ export interface ValidationResult {
  */
 export const UPLOAD_CONFIG: Record<UploadType, UploadConfig> = {
   [UploadType.POSTS]: {
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 10 * 1024 * 1024, // 10MB (Imágenes)
     allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
     allowedMimes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
     multiple: true,
   },
   [UploadType.PDF]: {
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 30 * 1024 * 1024, // 30MB (PDFs)
     allowedExtensions: ['.pdf'],
     allowedMimes: ['application/pdf'],
     multiple: false,
   },
   [UploadType.DOCUMENTOS]: {
-    maxSize: 15 * 1024 * 1024, // 15MB
+    maxSize: 20 * 1024 * 1024, // 20MB (Documentos)
     allowedExtensions: ['.pdf', '.doc', '.docx', '.xls', '.xlsx'],
     allowedMimes: [
       'application/pdf',

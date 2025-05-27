@@ -30,9 +30,9 @@ frontend/public/uploads/
 
 | Tipo | Tamaño Máx | Extensiones | Múltiples |
 |------|------------|-------------|-----------|
-| **Posts** | 5MB | .jpg, .jpeg, .png, .webp, .gif | ✅ |
-| **PDF** | 10MB | .pdf | ❌ |
-| **Documentos** | 15MB | .pdf, .doc, .docx, .xls, .xlsx | ✅ |
+| **Posts** | 10MB | .jpg, .jpeg, .png, .webp, .gif | ✅ |
+| **PDF** | 30MB | .pdf | ❌ |
+| **Documentos** | 20MB | .pdf, .doc, .docx, .xls, .xlsx | ✅ |
 | **Profiles** | 2MB | .jpg, .jpeg, .png | ❌ |
 | **Temp** | 20MB | Cualquiera | ✅ |
 
