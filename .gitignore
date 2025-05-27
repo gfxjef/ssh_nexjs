@@ -71,6 +71,13 @@ backend/db/pdf_manager/pdf_files/
 backend/db/pdf_manager/pdf_files/**/*
 
 # ========================================
+# ARTEFACTOS DE DESPLIEGUE (Render)
+# ========================================
+# Carpeta creada incorrectamente en Render debido a rutas relativas
+# antes de migrar a GCS o similar.
+backend/frontend/
+
+# ========================================
 # ARCHIVOS DE PRUEBA Y TEMPORALES
 # ========================================
 # Archivos de testing y desarrollo

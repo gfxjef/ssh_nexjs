@@ -3,6 +3,8 @@ import pathlib
 from typing import Optional, Tuple
 import logging
 from enum import Enum
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +16,8 @@ class UploadType(Enum):
     PROFILES = "profiles"
     TEMP = "temp"
 
-class UploadManager:
-    """Gestor centralizado para uploads de archivos"""
-    
-    # Ruta base para uploads - ahora centralizada en frontend
-    BASE_UPLOAD_PATH = os.path.join("frontend", "public", "uploads")
+class S3UploadManager:
+    """Gestor centralizado para uploads de archivos usando AWS S3"""
     
     # Configuración por tipo de archivo
     UPLOAD_CONFIG = {
@@ -55,42 +54,25 @@ class UploadManager:
         }
     }
 
-    @classmethod
-    def ensure_upload_directory(cls, upload_type: UploadType) -> str:
-        """
-        Asegura que la carpeta de upload existe, la crea si no existe
-        
-        Args:
-            upload_type: Tipo de upload (posts, pdf, etc.)
-            
-        Returns:
-            str: Ruta absoluta de la carpeta creada
-            
-        Raises:
-            OSError: Si no se puede crear la carpeta
-        """
+    def __init__(self):
+        """Inicializar cliente S3"""
         try:
-            # Construir ruta completa
-            upload_path = os.path.join(cls.BASE_UPLOAD_PATH, upload_type.value)
+            self.s3_client = boto3.client('s3')
+            self.bucket_name = os.environ.get('S3_BUCKET')
             
-            # Crear directorio si no existe
-            pathlib.Path(upload_path).mkdir(parents=True, exist_ok=True)
+            if not self.bucket_name:
+                raise ValueError("S3_BUCKET environment variable is required")
+                
+            logger.info(f"S3UploadManager inicializado con bucket: {self.bucket_name}")
             
-            # Verificar que se creó correctamente
-            if not os.path.exists(upload_path):
-                raise OSError(f"No se pudo crear la carpeta: {upload_path}")
-            
-            # Log para debugging
-            logger.info(f"Carpeta de upload verificada/creada: {upload_path}")
-            
-            return os.path.abspath(upload_path)
-            
+        except NoCredentialsError:
+            logger.error("AWS credentials not found")
+            raise
         except Exception as e:
-            logger.error(f"Error creando carpeta de upload {upload_type.value}: {str(e)}")
-            raise OSError(f"Error creando carpeta de upload: {str(e)}")
+            logger.error(f"Error inicializando S3 client: {str(e)}")
+            raise
 
-    @classmethod
-    def validate_file(cls, file_size: int, filename: str, mime_type: str, upload_type: UploadType) -> Tuple[bool, Optional[str]]:
+    def validate_file(self, file_size: int, filename: str, mime_type: str, upload_type: UploadType) -> Tuple[bool, Optional[str]]:
         """
         Valida un archivo según las reglas del tipo de upload
         
@@ -103,7 +85,7 @@ class UploadManager:
         Returns:
             Tuple[bool, Optional[str]]: (es_válido, mensaje_error)
         """
-        config = cls.UPLOAD_CONFIG.get(upload_type)
+        config = self.UPLOAD_CONFIG.get(upload_type)
         if not config:
             return False, f"Tipo de upload no válido: {upload_type}"
         
@@ -126,43 +108,107 @@ class UploadManager:
         
         return True, None
 
-    @classmethod
-    def get_upload_path(cls, upload_type: UploadType, filename: str) -> str:
+    def upload_file(self, file_data, filename: str, upload_type: UploadType) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Obtiene la ruta completa donde guardar un archivo
+        Sube un archivo a S3
         
         Args:
-            upload_type: Tipo de upload
+            file_data: Datos del archivo (bytes o file-like object)
             filename: Nombre del archivo
+            upload_type: Tipo de upload
             
         Returns:
-            str: Ruta completa del archivo
+            Tuple[bool, Optional[str], Optional[str]]: (success, url, error_message)
         """
-        # Asegurar que la carpeta existe
-        upload_dir = cls.ensure_upload_directory(upload_type)
-        
-        # Sanitizar nombre de archivo
-        safe_filename = cls.sanitize_filename(filename)
-        
-        return os.path.join(upload_dir, safe_filename)
+        try:
+            # Sanitizar nombre de archivo
+            safe_filename = self.sanitize_filename(filename)
+            
+            # Crear key S3 con estructura de carpetas
+            s3_key = f"{upload_type.value}/{safe_filename}"
+            
+            # Subir archivo a S3
+            self.s3_client.upload_fileobj(
+                file_data,
+                self.bucket_name,
+                s3_key,
+                ExtraArgs={
+                    'ContentType': self._get_content_type(safe_filename),
+                    'CacheControl': 'max-age=31536000'  # Cache por 1 año
+                }
+            )
+            
+            # Generar URL pública
+            url = f"https://{self.bucket_name}.s3.{os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')}.amazonaws.com/{s3_key}"
+            
+            logger.info(f"Archivo subido exitosamente a S3: {s3_key}")
+            return True, url, None
+            
+        except ClientError as e:
+            logger.error(f"Error subiendo archivo a S3: {str(e)}")
+            return False, None, f"Error subiendo archivo: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error inesperado subiendo archivo: {str(e)}")
+            return False, None, f"Error inesperado: {str(e)}"
 
-    @classmethod
-    def get_relative_path(cls, upload_type: UploadType, filename: str) -> str:
+    def delete_file(self, file_url: str) -> bool:
         """
-        Obtiene la ruta relativa para usar en URLs
+        Elimina un archivo de S3 basado en su URL
         
         Args:
-            upload_type: Tipo de upload
-            filename: Nombre del archivo
+            file_url: URL del archivo en S3
             
         Returns:
-            str: Ruta relativa desde public/
+            bool: True si se eliminó exitosamente
         """
-        safe_filename = cls.sanitize_filename(filename)
-        return f"/uploads/{upload_type.value}/{safe_filename}"
+        try:
+            # Extraer key S3 de la URL
+            s3_key = self._extract_s3_key_from_url(file_url)
+            if not s3_key:
+                logger.error(f"No se pudo extraer key S3 de la URL: {file_url}")
+                return False
+            
+            # Eliminar archivo de S3
+            self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
+            
+            logger.info(f"Archivo eliminado de S3: {s3_key}")
+            return True
+            
+        except ClientError as e:
+            logger.error(f"Error eliminando archivo de S3: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error inesperado eliminando archivo: {str(e)}")
+            return False
 
-    @classmethod
-    def sanitize_filename(cls, filename: str) -> str:
+    def _extract_s3_key_from_url(self, url: str) -> Optional[str]:
+        """Extrae la key S3 de una URL"""
+        try:
+            # URL formato: https://bucket.s3.region.amazonaws.com/key
+            if f"{self.bucket_name}.s3." in url:
+                return url.split(f"{self.bucket_name}.s3.{os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')}.amazonaws.com/")[1]
+            return None
+        except:
+            return None
+
+    def _get_content_type(self, filename: str) -> str:
+        """Determina el Content-Type basado en la extensión del archivo"""
+        ext = pathlib.Path(filename).suffix.lower()
+        content_types = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.pdf': 'application/pdf',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xls': 'application/vnd.ms-excel',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+        return content_types.get(ext, 'application/octet-stream')
+
+    def sanitize_filename(self, filename: str) -> str:
         """
         Sanitiza el nombre del archivo para evitar problemas de seguridad
         
@@ -186,6 +232,49 @@ class UploadManager:
             safe_name = f"{name_part}{ext_part}"
         
         return safe_name
+
+# Instancia global del manager
+upload_manager = S3UploadManager()
+
+# Mantener compatibilidad con código existente
+class UploadManager:
+    """Clase de compatibilidad que redirige al S3UploadManager"""
+    
+    @classmethod
+    def validate_file(cls, file_size: int, filename: str, mime_type: str, upload_type: UploadType) -> Tuple[bool, Optional[str]]:
+        return upload_manager.validate_file(file_size, filename, mime_type, upload_type)
+    
+    @classmethod
+    def sanitize_filename(cls, filename: str) -> str:
+        return upload_manager.sanitize_filename(filename)
+    
+    @classmethod
+    def upload_file(cls, file_data, filename: str, upload_type: UploadType) -> Tuple[bool, Optional[str], Optional[str]]:
+        return upload_manager.upload_file(file_data, filename, upload_type)
+    
+    @classmethod
+    def delete_file(cls, file_url: str) -> bool:
+        return upload_manager.delete_file(file_url)
+    
+    # Métodos legacy para mantener compatibilidad (deprecated)
+    @classmethod
+    def ensure_upload_directory(cls, upload_type: UploadType) -> str:
+        """Método legacy - ya no se usa con S3"""
+        logger.warning("ensure_upload_directory está deprecated con S3")
+        return f"s3://{upload_manager.bucket_name}/{upload_type.value}/"
+    
+    @classmethod
+    def get_upload_path(cls, upload_type: UploadType, filename: str) -> str:
+        """Método legacy - ya no se usa con S3"""
+        logger.warning("get_upload_path está deprecated con S3")
+        safe_filename = upload_manager.sanitize_filename(filename)
+        return f"s3://{upload_manager.bucket_name}/{upload_type.value}/{safe_filename}"
+    
+    @classmethod
+    def get_relative_path(cls, upload_type: UploadType, filename: str) -> str:
+        """Método legacy - devuelve URL de S3"""
+        safe_filename = upload_manager.sanitize_filename(filename)
+        return f"https://{upload_manager.bucket_name}.s3.{os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')}.amazonaws.com/{upload_type.value}/{safe_filename}"
 
     @classmethod
     def cleanup_temp_files(cls, max_age_hours: int = 24) -> int:

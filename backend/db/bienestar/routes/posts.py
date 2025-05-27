@@ -689,11 +689,10 @@ def get_postulantes_del_post(post_id):
 @bienestar_bp.route('/posts/upload-image', methods=['POST'])
 def upload_image():
     """
-    Endpoint para subir imágenes para posts.
-    Usa el sistema centralizado de uploads.
+    Endpoint para subir imágenes para posts usando AWS S3.
     """
     try:
-        # Importar nuestro sistema centralizado
+        # Importar nuestro sistema centralizado S3
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'utils'))
@@ -738,40 +737,37 @@ def upload_image():
         if not is_valid:
             return jsonify({'success': False, 'error': error_msg}), 400
         
-        # Obtener ruta usando el sistema centralizado
+        # Generar nombre único para S3
         from datetime import datetime
         import uuid
         
-        # Generar nombre único
         file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'jpg'
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         unique_id = str(uuid.uuid4())[:8]
         unique_filename = f"post_image_{timestamp}_{unique_id}.{file_extension}"
         
-        # Sanitizar nombre
-        safe_filename = UploadManager.sanitize_filename(unique_filename)
+        # Subir archivo a S3
+        success, s3_url, error_message = UploadManager.upload_file(
+            file_data=file,
+            filename=unique_filename,
+            upload_type=UploadType.POSTS
+        )
         
-        # Obtener ruta completa usando sistema centralizado
-        file_path = UploadManager.get_upload_path(UploadType.POSTS, safe_filename)
+        if not success:
+            print(f"❌ Error subiendo a S3: {error_message}")
+            return jsonify({'success': False, 'error': f'Error subiendo archivo: {error_message}'}), 500
         
-        # Guardar archivo
-        file.save(file_path)
-        print(f"✅ Imagen guardada en sistema centralizado: {file_path}")
-        
-        # Obtener URL relativa para frontend
-        relative_url = UploadManager.get_relative_path(UploadType.POSTS, safe_filename)
-        
-        # Generar URL completa
-        base_url = request.host_url.rstrip('/')
-        public_url = f"{base_url}{relative_url}"
+        print(f"✅ Imagen subida exitosamente a S3: {s3_url}")
         
         return jsonify({
             'success': True,
-            'url': public_url,
-            'filename': safe_filename,
-            'relative_path': relative_url
+            'url': s3_url,
+            'filename': unique_filename,
+            'message': 'Imagen subida exitosamente a S3'
         })
         
     except Exception as e:
         print(f"❌ Error al subir imagen: {str(e)}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
