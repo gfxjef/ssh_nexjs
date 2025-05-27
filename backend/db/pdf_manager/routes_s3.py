@@ -442,6 +442,13 @@ def process_legacy():
     return upload_pdf()
 
 
+@pdf_manager_s3_bp.route('/upload-pdf-async', methods=['POST'])
+def upload_pdf_async_legacy():
+    """Endpoint de compatibilidad para upload-pdf-async del sistema anterior"""
+    logger.warning("⚠️ Usando endpoint legacy /upload-pdf-async - redirigiendo a nuevo sistema S3")
+    return upload_pdf()
+
+
 @pdf_manager_s3_bp.route('/list', methods=['GET'])
 def list_legacy():
     """Endpoint de compatibilidad para listar catálogos"""

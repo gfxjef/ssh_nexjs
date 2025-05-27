@@ -18,6 +18,9 @@ from db.encuestas import encuestas_bp, init_encuestas_db
 # Importar el blueprint del gestor de PDFs
 from db.pdf_manager import pdf_manager_bp, init_pdf_module
 
+# Importar el blueprint del gestor de PDFs con S3 (nueva arquitectura)
+from db.pdf_manager.routes_s3 import pdf_manager_s3_bp
+
 # Importar el blueprint de marketing (stock)
 from db.marketing import stock_bp
 from db.marketing import solicitudes_bp
@@ -61,6 +64,9 @@ app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
 
 # Registrar el blueprint del gestor de PDFs
 app.register_blueprint(pdf_manager_bp) # El prefijo ya está en el blueprint
+
+# Registrar el blueprint del gestor de PDFs con S3 (nueva arquitectura)
+app.register_blueprint(pdf_manager_s3_bp, url_prefix='/pdf-manager-s3')
 
 # Registrar el blueprint de marketing (stock)
 app.register_blueprint(stock_bp) # El prefijo ya está en el blueprint (url_prefix='/api/marketing')

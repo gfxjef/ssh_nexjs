@@ -280,7 +280,7 @@
 <script>
 // Definición de AppConfig y Router (debe estar antes de su uso)
 var AppConfig = {
-  BASE_URL: '{{ pdf_manager_base_url | default("/api/pdfs") | safe }}',
+  BASE_URL: '{{ pdf_manager_base_url | default("/pdf-manager-s3") | safe }}',
   STATIC_BASE_URL: '{{ pdf_manager_static_url | default("/api/pdfs/static") | safe }}',
   
   _cleanBase: function(url) {
