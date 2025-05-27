@@ -1,0 +1,10 @@
+# Mantener estructura de carpeta uploads
+# Esta carpeta contiene los archivos subidos por usuarios
+# Los archivos no se incluyen en Git para evitar conflictos
+
+# Estructura creada automáticamente:
+# posts/     - Imágenes de publicaciones
+# pdf/       - Documentos PDF 
+# documentos/ - Documentos generales
+# profiles/  - Imágenes de perfil
+# temp/      - Archivos temporales 

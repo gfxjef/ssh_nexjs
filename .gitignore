@@ -42,24 +42,38 @@ __pycache__/
 tasks.json
 tasks/
 
-# Archivos subidos por usuarios (no incluir en el repositorio)
-# Frontend uploads
+# ========================================
+# UPLOADS CENTRALIZADOS (Sistema Nuevo)
+# ========================================
+# Todas las subidas de archivos están centralizadas en frontend/public/uploads/
+# Esto evita conflictos con git pull y perdida de archivos
+
+# Directorio principal de uploads centralizado
 frontend/public/uploads/
 frontend/public/uploads/**/*
 
-# Backend uploads - todas las carpetas de uploads
+# Mantener estructura básica con .gitkeep
+!frontend/public/uploads/.gitkeep
+
+# ========================================
+# UPLOADS LEGACY (Sistema Anterior)
+# ========================================
+# Carpetas del sistema anterior que se van a eliminar
 backend/uploads/
 backend/uploads/**/*
 backend/db/uploads/
 backend/db/uploads/**/*
-
-# Uploads en la raíz del proyecto
 uploads/
 uploads/**/*
 
-# Archivos específicos de módulos
+# Archivos específicos de módulos legacy
 backend/db/pdf_manager/pdf_files/
 backend/db/pdf_manager/pdf_files/**/*
 
-# Mantener solo los archivos .gitkeep para la estructura
-!**/.gitkeep 
+# ========================================
+# ARCHIVOS DE PRUEBA Y TEMPORALES
+# ========================================
+# Archivos de testing y desarrollo
+test_upload_utils.py
+**/test_uploads/
+**/*_test_* 
