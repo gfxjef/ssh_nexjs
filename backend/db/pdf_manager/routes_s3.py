@@ -813,69 +813,61 @@ def catalogo_route():
         return jsonify({'error': str(e)}), 500
 
 
-@pdf_manager_s3_bp.route('/listar-pdfs-procesados', methods=['GET'])
-def listar_pdfs_procesados_api():
+@pdf_manager_s3_bp.route('/listar-pdfs-procesados')
+def listar_pdfs_procesados_compatibilidad():
     """
-    Endpoint de compatibilidad para el frontend existente.
-    Adapta la respuesta del sistema S3 al formato esperado por el frontend.
+    Endpoint de compatibilidad con el frontend existente
+    Devuelve la lista de PDFs en el formato esperado por el frontend
     """
     try:
         logger.info("📋 Listando catálogos (compatibilidad con frontend)")
         
-        # Obtener catálogos del sistema S3
-        catalogos = catalogo_manager.listar_catalogos(
-            estado=EstadoCatalogo.ACTIVO,  # Solo catálogos activos
-            limite=100,  # Límite generoso para compatibilidad
-            offset=0
-        )
+        # Obtener todos los catálogos
+        catalogos = catalogo_manager.listar_catalogos()
         
-        # Procesar cada catálogo para el formato de compatibilidad
-        processed_catalogs = []
-        for catalogo in catalogos:
-            # Construir la información básica del catálogo
-            catalog_info = {
-                'name': catalogo.get('nombre', ''),
-                'pages': catalogo.get('total_paginas', 0),
-                'status': catalogo.get('estado', 'unknown'),
-                'created': catalogo.get('fecha_creacion', ''),
-                'size': catalogo.get('tamaño_archivo', 0)
+        # Adaptar formato para compatibilidad con frontend legacy
+        pdfs_legacy = []
+        for cat in catalogos:
+            
+            # Obtener thumbnail para el catálogo
+            thumbnail_url = None
+            docs = catalogo_manager.obtener_documentos_catalogo(cat['id'])
+            for doc in docs:
+                if doc['tipo_documento'] == 'thumbnail':
+                    thumbnail_url = f"/api/pdfs/processed_files/{doc['url_s3']}"
+                    break
+            
+            # Si no hay thumbnail, usar placeholder
+            if not thumbnail_url:
+                thumbnail_url = "/api/pdfs/images/pdf-placeholder.svg"
+            
+            # Construir URL de descarga a través del proxy
+            download_url = f"/api/pdfs/download/{cat['id']}"
+            
+            pdf_legacy = {
+                'id': cat['id'],
+                'name': cat['nombre'], 
+                'description': cat.get('descripcion', ''),
+                'thumbnailUrl': thumbnail_url,
+                'downloadUrl': download_url,  # URL de descarga a través del proxy
+                'url': download_url,  # URL directa - ahora apunta al proxy
+                'status': cat.get('estado', 'procesado'),
+                'uploadDate': cat.get('fecha_creacion', ''),
+                'tags': cat.get('tags', [])
             }
             
-            # Manejar thumbnail - verificar si ya es una URL completa
-            thumbnail_url = catalogo.get('thumbnail_url')
-            if thumbnail_url:
-                if thumbnail_url.startswith('http'):
-                    # Ya es una URL completa de S3
-                    catalog_info['thumbnail_path_relative'] = thumbnail_url
-                else:
-                    # Es una ruta relativa, construir URL completa
-                    catalog_info['thumbnail_path_relative'] = f"/api/pdfs/processed_files/{thumbnail_url}"
-            else:
-                catalog_info['thumbnail_path_relative'] = None
-            
-            # Manejar PDF original
-            pdf_url = catalogo.get('pdf_url')
-            if pdf_url:
-                if pdf_url.startswith('http'):
-                    # Ya es una URL completa de S3
-                    catalog_info['original_pdf_path_relative'] = pdf_url
-                else:
-                    # Es una ruta relativa
-                    catalog_info['original_pdf_path_relative'] = f"/api/pdfs/processed_files/{pdf_url}"
-            else:
-                catalog_info['original_pdf_path_relative'] = None
-            
-            processed_catalogs.append(catalog_info)
+            pdfs_legacy.append(pdf_legacy)
         
-        # Ordenar por nombre
-        processed_catalogs.sort(key=lambda x: x['name'].lower())
+        logger.info(f"✅ Devolviendo {len(pdfs_legacy)} catálogos (formato compatibilidad)")
         
-        logger.info(f"✅ Devolviendo {len(processed_catalogs)} catálogos (formato compatibilidad)")
-        return jsonify(processed_catalogs)
+        return jsonify(pdfs_legacy), 200
         
     except Exception as e:
-        logger.error(f"Error en listar_pdfs_procesados_api: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error listando PDFs (compatibilidad): {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @pdf_manager_s3_bp.route('/upload-pdf', methods=['POST'])
@@ -1114,4 +1106,100 @@ def api_docs():
         }
     }
     
-    return jsonify(docs), 200 
+    return jsonify(docs), 200
+
+
+@pdf_manager_s3_bp.route('/download/<int:catalogo_id>')
+def download_pdf_proxy(catalogo_id):
+    """
+    Endpoint de descarga con proxy para evitar problemas CORS
+    Descarga el PDF desde S3 y lo sirve con headers apropiados
+    """
+    try:
+        # Obtener información del PDF original
+        pdf_info = catalogo_manager.obtener_pdf_original(catalogo_id)
+        
+        if not pdf_info:
+            return jsonify({
+                'success': False,
+                'error': f'PDF no encontrado para catálogo {catalogo_id}'
+            }), 404
+        
+        s3_url = pdf_info['url_s3']
+        filename = pdf_info['nombre_archivo']
+        
+        logger.info(f"📥 Descargando PDF desde S3: {s3_url}")
+        
+        # Descargar el archivo desde S3
+        response = requests.get(s3_url, stream=True, timeout=30)
+        
+        if response.status_code != 200:
+            logger.error(f"Error descargando desde S3: {response.status_code}")
+            return jsonify({
+                'success': False,
+                'error': f'Error descargando archivo desde S3: {response.status_code}'
+            }), 500
+        
+        # Servir el archivo con headers apropiados
+        from flask import Response
+        
+        def generate():
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        
+        return Response(
+            generate(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'application/pdf',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error en descarga proxy: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@pdf_manager_s3_bp.route('/download-by-name/<path:pdf_name>')
+def download_pdf_by_name(pdf_name):
+    """
+    Endpoint de descarga por nombre (compatibilidad con frontend)
+    """
+    try:
+        # Buscar catálogo por nombre
+        catalogos = catalogo_manager.buscar_catalogos(pdf_name)
+        
+        if not catalogos:
+            return jsonify({
+                'success': False,
+                'error': f'Catálogo "{pdf_name}" no encontrado'
+            }), 404
+        
+        # Tomar el primer resultado que coincida exactamente
+        catalogo_encontrado = None
+        for cat in catalogos:
+            if cat['nombre'] == pdf_name or cat['nombre'].replace(' ', '_') == pdf_name:
+                catalogo_encontrado = cat
+                break
+        
+        if not catalogo_encontrado:
+            # Si no encuentra coincidencia exacta, tomar el primero
+            catalogo_encontrado = catalogos[0]
+        
+        # Redirigir al endpoint de descarga por ID
+        return download_pdf_proxy(catalogo_encontrado['id'])
+        
+    except Exception as e:
+        logger.error(f"Error en descarga por nombre: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 
