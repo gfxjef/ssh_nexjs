@@ -454,4 +454,90 @@ def documento_to_dict(doc: CatalogoDoc) -> Dict:
         'fecha_creacion': doc.fecha_creacion.isoformat() if doc.fecha_creacion else None,
         'metadatos': doc.metadatos,
         'estado_archivo': doc.estado_archivo.value
-    } 
+    }
+
+
+def init_pdf_s3_db():
+    """
+    Inicializa las tablas necesarias para el sistema PDF S3
+    Crea las tablas si no existen, las usa si ya existen
+    """
+    db = MySQLConnection()
+    
+    print("PDF_S3: Iniciando configuración de base de datos...")
+    
+    # Crear tabla catalogos
+    create_catalogos_table = """
+    CREATE TABLE IF NOT EXISTS catalogos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        categoria VARCHAR(100) DEFAULT 'general',
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        estado ENUM('activo', 'inactivo', 'procesando', 'error') DEFAULT 'procesando',
+        usuario_id INT,
+        total_paginas INT DEFAULT 0,
+        tamaño_archivo BIGINT DEFAULT 0,
+        nombre_archivo_original VARCHAR(255),
+        version VARCHAR(50) DEFAULT '1.0',
+        tags JSON,
+        metadatos_procesamiento JSON,
+        INDEX idx_nombre (nombre),
+        INDEX idx_categoria (categoria),
+        INDEX idx_estado (estado),
+        INDEX idx_fecha_creacion (fecha_creacion),
+        INDEX idx_usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """
+    
+    # Crear tabla catalogos_docs
+    create_catalogos_docs_table = """
+    CREATE TABLE IF NOT EXISTS catalogos_docs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        catalogo_id INT NOT NULL,
+        tipo_archivo ENUM('pdf_original', 'pagina_webp', 'thumbnail', 'preview', 'pagina_png') NOT NULL,
+        nombre_archivo VARCHAR(255) NOT NULL,
+        url_s3 TEXT NOT NULL,
+        s3_key VARCHAR(500) NOT NULL,
+        numero_pagina INT,
+        tamaño_archivo BIGINT DEFAULT 0,
+        mime_type VARCHAR(100),
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        metadatos JSON,
+        checksum_md5 VARCHAR(32),
+        estado_archivo ENUM('disponible', 'procesando', 'error', 'eliminado') DEFAULT 'disponible',
+        FOREIGN KEY (catalogo_id) REFERENCES catalogos(id) ON DELETE CASCADE,
+        INDEX idx_catalogo_id (catalogo_id),
+        INDEX idx_tipo_archivo (tipo_archivo),
+        INDEX idx_numero_pagina (numero_pagina),
+        INDEX idx_s3_key (s3_key),
+        INDEX idx_estado_archivo (estado_archivo),
+        UNIQUE KEY unique_s3_key (s3_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """
+    
+    try:
+        # Crear tabla catalogos
+        result = db.execute_query(create_catalogos_table, fetch=False)
+        if result:
+            print("PDF_S3: Tabla 'catalogos' creada/verificada exitosamente.")
+        else:
+            print("PDF_S3: Error al crear/verificar tabla 'catalogos'.")
+            return False
+        
+        # Crear tabla catalogos_docs
+        result = db.execute_query(create_catalogos_docs_table, fetch=False)
+        if result:
+            print("PDF_S3: Tabla 'catalogos_docs' creada/verificada exitosamente.")
+        else:
+            print("PDF_S3: Error al crear/verificar tabla 'catalogos_docs'.")
+            return False
+        
+        print("PDF_S3: Configuración de base de datos completada exitosamente.")
+        return True
+        
+    except Exception as e:
+        print(f"PDF_S3: Error durante la inicialización de la base de datos: {str(e)}")
+        return False 

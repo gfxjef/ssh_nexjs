@@ -460,6 +460,64 @@ def list_legacy():
 # ENDPOINTS DE COMPATIBILIDAD CON FRONTEND
 # ==========================================
 
+@pdf_manager_s3_bp.route('/upload-page', methods=['GET'])
+def upload_page_route():
+    """Página para subir PDFs - Compatibilidad con sistema anterior"""
+    try:
+        # En lugar de servir una página HTML, devolvemos información sobre el endpoint de upload
+        return jsonify({
+            'message': 'Sistema S3 activo',
+            'upload_endpoint': '/api/pdfs/upload',
+            'method': 'POST',
+            'content_type': 'multipart/form-data',
+            'required_fields': {
+                'file': 'Archivo PDF (requerido)',
+                'descripcion': 'Descripción del catálogo (opcional)',
+                'categoria': 'Categoría del catálogo (opcional, default: general)',
+                'usuario_id': 'ID del usuario (opcional)'
+            },
+            'example_curl': 'curl -X POST /api/pdfs/upload -F "file=@documento.pdf" -F "descripcion=Mi catálogo"'
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@pdf_manager_s3_bp.route('/ver-todos', methods=['GET'])
+def ver_todos_catalogos_route():
+    """Página para visualizar catálogos - Compatibilidad con sistema anterior"""
+    try:
+        # Redirigir a la API de listado de catálogos
+        return jsonify({
+            'message': 'Sistema S3 activo',
+            'catalogos_endpoint': '/api/pdfs/catalogos',
+            'listar_endpoint': '/api/pdfs/listar-pdfs-procesados',
+            'method': 'GET',
+            'note': 'Use los endpoints de API para obtener datos de catálogos'
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@pdf_manager_s3_bp.route('/', methods=['GET'])
+def index_route():
+    """Página principal del gestor de PDFs - Compatibilidad"""
+    try:
+        return jsonify({
+            'message': 'PDF Manager S3 API',
+            'version': '2.0.0',
+            'status': 'active',
+            'endpoints': {
+                'upload': '/api/pdfs/upload',
+                'list': '/api/pdfs/catalogos',
+                'list_legacy': '/api/pdfs/listar-pdfs-procesados',
+                'docs': '/api/pdfs/docs',
+                'health': '/api/pdfs/health'
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @pdf_manager_s3_bp.route('/listar-pdfs-procesados', methods=['GET'])
 def listar_pdfs_procesados_api():
     """

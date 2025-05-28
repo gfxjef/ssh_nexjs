@@ -87,6 +87,12 @@ with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la apli
     # init_pdf_module(app) # COMENTADO: Inicialización del sistema local
     # print("APP: init_pdf_module() finalizado.") # COMENTADO
     print("PDF_MANAGER: Configurado para usar S3. No se requiere init_pdf_module() local.")
+    
+    # Inicializar la base de datos del sistema S3
+    from db.pdf_manager.models import init_pdf_s3_db
+    print("APP: Llamando a init_pdf_s3_db()")
+    init_pdf_s3_db()
+    print("APP: init_pdf_s3_db() finalizado.")
 
 # Authentication routes
 @app.route('/api/auth/login', methods=['POST'])
