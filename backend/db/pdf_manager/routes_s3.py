@@ -5,7 +5,7 @@ Sistema profesional de gestión de catálogos
 
 import os
 import logging
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -454,6 +454,218 @@ def list_legacy():
     """Endpoint de compatibilidad para listar catálogos"""
     logger.warning("⚠️ Usando endpoint legacy /list - considerar migrar a /catalogos")
     return list_catalogos()
+
+
+# ==========================================
+# ENDPOINTS DE COMPATIBILIDAD CON FRONTEND
+# ==========================================
+
+@pdf_manager_s3_bp.route('/listar-pdfs-procesados', methods=['GET'])
+def listar_pdfs_procesados_api():
+    """
+    Endpoint de compatibilidad para el frontend existente.
+    Adapta la respuesta del sistema S3 al formato esperado por el frontend.
+    """
+    try:
+        logger.info("📋 Listando catálogos (compatibilidad con frontend)")
+        
+        # Obtener catálogos del sistema S3
+        catalogos = catalogo_manager.listar_catalogos(
+            estado=EstadoCatalogo.ACTIVO,  # Solo catálogos activos
+            limite=100,  # Límite generoso para compatibilidad
+            offset=0
+        )
+        
+        # Adaptar formato para compatibilidad con frontend
+        processed_catalogs = []
+        
+        for catalogo in catalogos:
+            # Obtener información adicional del catálogo
+            catalogo_completo = catalogo_manager.obtener_catalogo_completo(catalogo['id'])
+            
+            if catalogo_completo:
+                catalog_data = {
+                    'name': catalogo['nombre'],
+                    'pages': catalogo['total_paginas'],
+                    'has_images': catalogo['total_paginas'] > 0,
+                    'original_pdf_available': bool(catalogo_completo['archivos']['pdf_original']),
+                    'original_pdf_path_relative': None,
+                    'thumbnail_path_relative': None,
+                    'images_base_path_relative': catalogo['nombre'],
+                    # Campos adicionales del sistema S3
+                    'catalogo_id': catalogo['id'],
+                    'descripcion': catalogo.get('descripcion', ''),
+                    'categoria': catalogo.get('categoria', 'general'),
+                    'estado': catalogo.get('estado', 'activo'),
+                    'fecha_creacion': catalogo.get('fecha_creacion'),
+                    'pdf_url': catalogo.get('pdf_url'),
+                    'thumbnail_url': catalogo.get('thumbnail_url')
+                }
+                
+                # Configurar URLs para compatibilidad
+                if catalogo_completo['archivos']['pdf_original']:
+                    catalog_data['original_pdf_path_relative'] = catalogo_completo['archivos']['pdf_original']['url_s3']
+                
+                if catalogo_completo['archivos']['thumbnail']:
+                    catalog_data['thumbnail_path_relative'] = catalogo_completo['archivos']['thumbnail']['url_s3']
+                
+                processed_catalogs.append(catalog_data)
+        
+        # Ordenar por nombre
+        processed_catalogs.sort(key=lambda x: x['name'].lower())
+        
+        logger.info(f"✅ Devolviendo {len(processed_catalogs)} catálogos (formato compatibilidad)")
+        return jsonify(processed_catalogs)
+        
+    except Exception as e:
+        logger.error(f"Error en listar_pdfs_procesados_api: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@pdf_manager_s3_bp.route('/upload-pdf', methods=['POST'])
+def upload_pdf_legacy():
+    """Endpoint de compatibilidad para upload-pdf del sistema anterior"""
+    logger.warning("⚠️ Usando endpoint legacy /upload-pdf - redirigiendo a nuevo sistema S3")
+    return upload_pdf()
+
+
+@pdf_manager_s3_bp.route('/delete-pdf', methods=['POST'])
+def delete_pdf_legacy():
+    """Endpoint de compatibilidad para eliminar PDFs"""
+    try:
+        data = request.get_json()
+        if not data or 'pdf_name' not in data:
+            return jsonify({
+                'success': False, 
+                'error': 'No se especificó el nombre del PDF'
+            }), 400
+        
+        pdf_name = data['pdf_name']
+        
+        # Buscar catálogo por nombre
+        catalogos = catalogo_manager.buscar_catalogos(pdf_name)
+        
+        if not catalogos:
+            return jsonify({
+                'success': False,
+                'error': f'Catálogo "{pdf_name}" no encontrado'
+            }), 404
+        
+        # Tomar el primer resultado que coincida exactamente
+        catalogo_encontrado = None
+        for cat in catalogos:
+            if cat['nombre'] == pdf_name:
+                catalogo_encontrado = cat
+                break
+        
+        if not catalogo_encontrado:
+            return jsonify({
+                'success': False,
+                'error': f'Catálogo "{pdf_name}" no encontrado'
+            }), 404
+        
+        # Eliminar usando el sistema S3
+        result = processor.delete_catalogo_complete(catalogo_encontrado['id'])
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': f'Catálogo "{pdf_name}" eliminado correctamente'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error en delete_pdf_legacy: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@pdf_manager_s3_bp.route('/progreso-pdf', methods=['GET'])
+def progreso_pdf_legacy():
+    """Endpoint de compatibilidad para consultar progreso"""
+    logger.warning("⚠️ Usando endpoint legacy /progreso-pdf - redirigiendo a /progress")
+    return get_progress()
+
+
+@pdf_manager_s3_bp.route('/processed_files/<path:filepath>')
+def serve_processed_pdf_files_legacy(filepath):
+    """
+    Endpoint de compatibilidad para servir archivos procesados.
+    Redirige a las URLs de S3 correspondientes.
+    """
+    try:
+        # Extraer información del filepath
+        # filepath será algo como "NombreDelPDF/page_1.webp" o "NombreDelPDF/thumbnail.webp"
+        parts = filepath.split('/')
+        if len(parts) < 2:
+            return jsonify({'error': 'Ruta de archivo inválida'}), 400
+        
+        catalogo_nombre = parts[0]
+        archivo_nombre = parts[1]
+        
+        # Buscar catálogo por nombre
+        catalogos = catalogo_manager.buscar_catalogos(catalogo_nombre)
+        
+        catalogo_encontrado = None
+        for cat in catalogos:
+            if cat['nombre'] == catalogo_nombre:
+                catalogo_encontrado = cat
+                break
+        
+        if not catalogo_encontrado:
+            return jsonify({'error': 'Catálogo no encontrado'}), 404
+        
+        # Obtener información completa del catálogo
+        catalogo_completo = catalogo_manager.obtener_catalogo_completo(catalogo_encontrado['id'])
+        
+        if not catalogo_completo:
+            return jsonify({'error': 'Información del catálogo no disponible'}), 404
+        
+        # Determinar qué tipo de archivo se está solicitando y redirigir a S3
+        if archivo_nombre.startswith('page_') and archivo_nombre.endswith('.webp'):
+            # Es una página específica
+            numero_pagina = archivo_nombre.replace('page_', '').replace('.webp', '')
+            try:
+                numero_pagina = int(numero_pagina)
+                paginas = catalogo_completo['archivos']['paginas']
+                
+                for pagina in paginas:
+                    if pagina['numero_pagina'] == numero_pagina:
+                        return redirect(pagina['url_s3'])
+                
+                return jsonify({'error': f'Página {numero_pagina} no encontrada'}), 404
+                
+            except ValueError:
+                return jsonify({'error': 'Número de página inválido'}), 400
+        
+        elif archivo_nombre.startswith('thumb_') or archivo_nombre == 'thumbnail.webp':
+            # Es un thumbnail
+            thumbnail = catalogo_completo['archivos']['thumbnail']
+            if thumbnail:
+                return redirect(thumbnail['url_s3'])
+            else:
+                return jsonify({'error': 'Thumbnail no disponible'}), 404
+        
+        elif archivo_nombre.endswith('.pdf'):
+            # Es el PDF original
+            pdf_original = catalogo_completo['archivos']['pdf_original']
+            if pdf_original:
+                return redirect(pdf_original['url_s3'])
+            else:
+                return jsonify({'error': 'PDF original no disponible'}), 404
+        
+        else:
+            return jsonify({'error': 'Tipo de archivo no reconocido'}), 400
+            
+    except Exception as e:
+        logger.error(f"Error sirviendo archivo legacy {filepath}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
 
 # ==========================================
