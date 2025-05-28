@@ -5,7 +5,7 @@ Sistema profesional de gestión de catálogos
 
 import os
 import logging
-from flask import Blueprint, request, jsonify, send_file, redirect
+from flask import Blueprint, request, jsonify, send_file, redirect, render_template, url_for
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -17,7 +17,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Crear blueprint
-pdf_manager_s3_bp = Blueprint('pdf_manager_s3', __name__)
+pdf_manager_s3_bp = Blueprint(
+    'pdf_manager_s3', 
+    __name__,
+    template_folder='templates',  # Carpeta de templates
+    static_folder='static',       # Carpeta de archivos estáticos
+    static_url_path='/api/pdfs/static',  # URL para archivos estáticos
+    url_prefix='/api/pdfs'        # Prefijo para todas las rutas
+)
 
 # Instancia global del procesador
 processor = PDFProcessorS3()
@@ -775,21 +782,33 @@ def ver_todos_catalogos_route():
 
 @pdf_manager_s3_bp.route('/', methods=['GET'])
 def index_route():
-    """Página principal del gestor de PDFs - Compatibilidad"""
+    """Página principal del visualizador de PDFs"""
     try:
-        return jsonify({
-            'message': 'PDF Manager S3 API',
-            'version': '2.0.0',
-            'status': 'active',
-            'endpoints': {
-                'upload': '/api/pdfs/upload',
-                'list': '/api/pdfs/catalogos',
-                'list_legacy': '/api/pdfs/listar-pdfs-procesados',
-                'docs': '/api/pdfs/docs',
-                'health': '/api/pdfs/health'
-            }
-        }), 200
+        # Verificar si se está solicitando un PDF específico
+        pdf_param = request.args.get('pdf')
+        
+        if pdf_param:
+            # Servir la página del visualizador de PDF individual
+            logger.info(f"📖 Sirviendo visualizador para PDF: {pdf_param}")
+            return render_template('pdf_reader/index.html', pdf_url=pdf_param)
+        else:
+            # Redirigir a la página de catálogos si no se especifica PDF
+            logger.info("🏠 Redirigiendo a página de catálogos")
+            return redirect(url_for('pdf_manager_s3.catalogo_route'))
+            
     except Exception as e:
+        logger.error(f"Error en index_route: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@pdf_manager_s3_bp.route('/catalogo', methods=['GET'])
+def catalogo_route():
+    """Página de listado de catálogos"""
+    try:
+        logger.info("📋 Sirviendo página de catálogos")
+        return render_template('pdf_reader/catalogo.html')
+    except Exception as e:
+        logger.error(f"Error en catalogo_route: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
@@ -809,40 +828,43 @@ def listar_pdfs_procesados_api():
             offset=0
         )
         
-        # Adaptar formato para compatibilidad con frontend
+        # Procesar cada catálogo para el formato de compatibilidad
         processed_catalogs = []
-        
         for catalogo in catalogos:
-            # Obtener información adicional del catálogo
-            catalogo_completo = catalogo_manager.obtener_catalogo_completo(catalogo['id'])
+            # Construir la información básica del catálogo
+            catalog_info = {
+                'name': catalogo.get('nombre', ''),
+                'pages': catalogo.get('total_paginas', 0),
+                'status': catalogo.get('estado', 'unknown'),
+                'created': catalogo.get('fecha_creacion', ''),
+                'size': catalogo.get('tamaño_archivo', 0)
+            }
             
-            if catalogo_completo:
-                catalog_data = {
-                    'name': catalogo['nombre'],
-                    'pages': catalogo['total_paginas'],
-                    'has_images': catalogo['total_paginas'] > 0,
-                    'original_pdf_available': bool(catalogo_completo['archivos']['pdf_original']),
-                    'original_pdf_path_relative': None,
-                    'thumbnail_path_relative': None,
-                    'images_base_path_relative': catalogo['nombre'],
-                    # Campos adicionales del sistema S3
-                    'catalogo_id': catalogo['id'],
-                    'descripcion': catalogo.get('descripcion', ''),
-                    'categoria': catalogo.get('categoria', 'general'),
-                    'estado': catalogo.get('estado', 'activo'),
-                    'fecha_creacion': catalogo.get('fecha_creacion'),
-                    'pdf_url': catalogo.get('pdf_url'),
-                    'thumbnail_url': catalogo.get('thumbnail_url')
-                }
-                
-                # Configurar URLs para compatibilidad
-                if catalogo_completo['archivos']['pdf_original']:
-                    catalog_data['original_pdf_path_relative'] = catalogo_completo['archivos']['pdf_original']['url_s3']
-                
-                if catalogo_completo['archivos']['thumbnail']:
-                    catalog_data['thumbnail_path_relative'] = catalogo_completo['archivos']['thumbnail']['url_s3']
-                
-                processed_catalogs.append(catalog_data)
+            # Manejar thumbnail - verificar si ya es una URL completa
+            thumbnail_url = catalogo.get('thumbnail_url')
+            if thumbnail_url:
+                if thumbnail_url.startswith('http'):
+                    # Ya es una URL completa de S3
+                    catalog_info['thumbnail_path_relative'] = thumbnail_url
+                else:
+                    # Es una ruta relativa, construir URL completa
+                    catalog_info['thumbnail_path_relative'] = f"/api/pdfs/processed_files/{thumbnail_url}"
+            else:
+                catalog_info['thumbnail_path_relative'] = None
+            
+            # Manejar PDF original
+            pdf_url = catalogo.get('pdf_url')
+            if pdf_url:
+                if pdf_url.startswith('http'):
+                    # Ya es una URL completa de S3
+                    catalog_info['original_pdf_path_relative'] = pdf_url
+                else:
+                    # Es una ruta relativa
+                    catalog_info['original_pdf_path_relative'] = f"/api/pdfs/processed_files/{pdf_url}"
+            else:
+                catalog_info['original_pdf_path_relative'] = None
+            
+            processed_catalogs.append(catalog_info)
         
         # Ordenar por nombre
         processed_catalogs.sort(key=lambda x: x['name'].lower())
@@ -929,76 +951,38 @@ def progreso_pdf_legacy():
 @pdf_manager_s3_bp.route('/processed_files/<path:filepath>')
 def serve_processed_pdf_files_legacy(filepath):
     """
-    Endpoint de compatibilidad para servir archivos procesados.
-    Redirige a las URLs de S3 correspondientes.
+    Sirve archivos procesados desde S3 o redirige a la URL correcta
+    Compatibilidad con el sistema anterior
     """
     try:
-        # Extraer información del filepath
-        # filepath será algo como "NombreDelPDF/page_1.webp" o "NombreDelPDF/thumbnail.webp"
-        parts = filepath.split('/')
-        if len(parts) < 2:
-            return jsonify({'error': 'Ruta de archivo inválida'}), 400
+        logger.info(f"📁 Solicitando archivo: {filepath}")
         
-        catalogo_nombre = parts[0]
-        archivo_nombre = parts[1]
+        # Si la filepath ya es una URL completa de S3, redirigir directamente
+        if filepath.startswith('https://'):
+            logger.info(f"🔗 Redirigiendo a URL S3: {filepath}")
+            return redirect(filepath)
         
-        # Buscar catálogo por nombre
-        catalogos = catalogo_manager.buscar_catalogos(catalogo_nombre)
+        # Buscar el archivo en la base de datos por s3_key
+        doc = catalogo_manager.obtener_documento_por_s3_key(filepath)
         
-        catalogo_encontrado = None
-        for cat in catalogos:
-            if cat['nombre'] == catalogo_nombre:
-                catalogo_encontrado = cat
-                break
+        if doc and doc.get('url_s3'):
+            logger.info(f"✅ Archivo encontrado en BD, redirigiendo a S3: {doc['url_s3']}")
+            return redirect(doc['url_s3'])
         
-        if not catalogo_encontrado:
-            return jsonify({'error': 'Catálogo no encontrado'}), 404
+        # Si no se encuentra en BD, intentar construir URL de S3 directamente
+        # Formato esperado: pdf/catalogo_id/archivo.ext
+        s3_url = f"https://redkossodo.s3.us-east-2.amazonaws.com/{filepath}"
+        logger.info(f"🔍 Intentando URL S3 directa: {s3_url}")
         
-        # Obtener información completa del catálogo
-        catalogo_completo = catalogo_manager.obtener_catalogo_completo(catalogo_encontrado['id'])
+        # Verificar si el archivo existe en S3 haciendo una redirección
+        return redirect(s3_url)
         
-        if not catalogo_completo:
-            return jsonify({'error': 'Información del catálogo no disponible'}), 404
-        
-        # Determinar qué tipo de archivo se está solicitando y redirigir a S3
-        if archivo_nombre.startswith('page_') and archivo_nombre.endswith('.webp'):
-            # Es una página específica
-            numero_pagina = archivo_nombre.replace('page_', '').replace('.webp', '')
-            try:
-                numero_pagina = int(numero_pagina)
-                paginas = catalogo_completo['archivos']['paginas']
-                
-                for pagina in paginas:
-                    if pagina['numero_pagina'] == numero_pagina:
-                        return redirect(pagina['url_s3'])
-                
-                return jsonify({'error': f'Página {numero_pagina} no encontrada'}), 404
-                
-            except ValueError:
-                return jsonify({'error': 'Número de página inválido'}), 400
-        
-        elif archivo_nombre.startswith('thumb_') or archivo_nombre == 'thumbnail.webp':
-            # Es un thumbnail
-            thumbnail = catalogo_completo['archivos']['thumbnail']
-            if thumbnail:
-                return redirect(thumbnail['url_s3'])
-            else:
-                return jsonify({'error': 'Thumbnail no disponible'}), 404
-        
-        elif archivo_nombre.endswith('.pdf'):
-            # Es el PDF original
-            pdf_original = catalogo_completo['archivos']['pdf_original']
-            if pdf_original:
-                return redirect(pdf_original['url_s3'])
-            else:
-                return jsonify({'error': 'PDF original no disponible'}), 404
-        
-        else:
-            return jsonify({'error': 'Tipo de archivo no reconocido'}), 400
-            
     except Exception as e:
-        logger.error(f"Error sirviendo archivo legacy {filepath}: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Error interno del servidor'}), 500
+        logger.error(f"Error sirviendo archivo {filepath}: {str(e)}", exc_info=True)
+        return jsonify({
+            'error': f'Archivo no encontrado: {filepath}',
+            'message': 'El archivo solicitado no está disponible'
+        }), 404
 
 
 # ==========================================

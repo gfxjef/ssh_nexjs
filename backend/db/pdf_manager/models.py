@@ -536,6 +536,31 @@ def init_pdf_s3_db():
             return False
         
         print("PDF_S3: Configuración de base de datos completada exitosamente.")
+        
+        # Crear vista para consultas complejas
+        create_vista_catalogos = """
+        CREATE OR REPLACE VIEW vista_catalogos_completos AS
+        SELECT 
+            c.*,
+            pdf.url_s3 as pdf_url,
+            pdf.s3_key as pdf_s3_key,
+            thumb.url_s3 as thumbnail_url,
+            thumb.s3_key as thumbnail_s3_key,
+            (SELECT COUNT(*) FROM catalogos_docs cd 
+             WHERE cd.catalogo_id = c.id AND cd.tipo_archivo = 'pagina_webp' AND cd.estado_archivo = 'disponible') as paginas_procesadas,
+            (SELECT COUNT(*) FROM catalogos_docs cd 
+             WHERE cd.catalogo_id = c.id AND cd.estado_archivo = 'disponible') as total_archivos
+        FROM catalogos c
+        LEFT JOIN catalogos_docs pdf ON c.id = pdf.catalogo_id AND pdf.tipo_archivo = 'pdf_original'
+        LEFT JOIN catalogos_docs thumb ON c.id = thumb.catalogo_id AND thumb.tipo_archivo = 'thumbnail'
+        """
+        
+        result = db.execute_query(create_vista_catalogos, fetch=False)
+        if result:
+            print("PDF_S3: Vista 'vista_catalogos_completos' creada/actualizada exitosamente.")
+        else:
+            print("PDF_S3: Error al crear/actualizar vista 'vista_catalogos_completos'.")
+        
         return True
         
     except Exception as e:
