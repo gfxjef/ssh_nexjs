@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import crypto from 'crypto';
 
 /**
- * API endpoint para subir archivos directamente al frontend (public/uploads)
+ * API endpoint para subir archivos directamente a AWS S3
  * Formato de nombre: nombrearchivo_codigo.ext
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 [UPLOAD] Starting file upload to frontend...');
+    console.log('🔄 [UPLOAD] Starting file upload to S3...');
     
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -27,11 +25,24 @@ export async function POST(request: NextRequest) {
 
     console.log(`📁 [UPLOAD] Processing file: ${file.name} (${file.size} bytes)`);
 
+    // Validaciones básicas del archivo
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: 'El archivo es demasiado grande (máximo 50MB)' }, { status: 400 });
+    }
+
+    // Validar extensiones permitidas
+    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'zip', 'rar', '7z', 'mp4', 'avi', 'mov', 'wmv'];
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    
+    if (!allowedExtensions.includes(extension)) {
+      return NextResponse.json({ error: 'Tipo de archivo no permitido' }, { status: 400 });
+    }
+
     // Generar código único
     const codigo = crypto.randomUUID();
     
     // Obtener extensión del archivo original
-    const extension = file.name.split('.').pop() || '';
     const nombreSinExtension = file.name.replace(`.${extension}`, '');
     
     // IMPORTANTE: Reemplazar espacios y caracteres problemáticos con _ para URLs seguras
@@ -43,104 +54,142 @@ export async function POST(request: NextRequest) {
     // Formato nuevo: nombrearchivo_codigo.ext (sin espacios ni caracteres especiales)
     const nuevoNombre = `${nombreLimpio}_${codigo}.${extension}`;
     
-    console.log(`📝 [UPLOAD] New filename format: ${nuevoNombre}`);
+    console.log(`📝 [UPLOAD] New S3 filename format: ${nuevoNombre}`);
 
-    // Crear carpeta si no existe
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadsDir, { recursive: true });
+    // === SUBIR ARCHIVO A S3 ===
+    try {
+      // Configuración de S3
+      const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
+      const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
+      const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
+      const S3_REGION = process.env.S3_REGION || 'us-east-2';
 
-    // Convertir archivo a buffer y guardarlo
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = join(uploadsDir, nuevoNombre);
-    
-    await writeFile(filePath, buffer);
-    console.log(`✅ [UPLOAD] File saved locally: ${filePath}`);
+      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !S3_BUCKET_NAME) {
+        console.error('❌ [S3] Missing S3 configuration environment variables');
+        return NextResponse.json({ error: 'Configuración de S3 no disponible' }, { status: 500 });
+      }
 
-    // Preparar datos para enviar al backend (solo metadata)
-    const documentData = {
-      titulo,
-      descripcion,
-      categoria_id: parseInt(categoria_id),
-      etiquetas: etiquetas ? etiquetas.split(',').map(id => parseInt(id)) : [],
-      es_publico,
-      autor,
-      grupo, // Grupo enviado desde el frontend
-      nombre_archivo: file.name, // Nombre original
-      ruta_archivo: `uploads/${nuevoNombre}`, // Ruta relativa desde public
-      tipo_mime: file.type,
-      tamaño_archivo: file.size
-    };
+      // Convertir archivo a buffer
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
 
-    console.log('📤 [UPLOAD] Sending metadata to backend...');
-    
-    const authHeader = request.headers.get('Authorization') || '';
-    console.log('🔑 [UPLOAD] Auth header:', authHeader ? `Present (${authHeader.substring(0, 20)}...)` : 'Missing');
-    console.log('📋 [UPLOAD] Document data:', JSON.stringify(documentData, null, 2));
+      // Preparar parámetros para S3
+      const s3Key = `documentos/${nuevoNombre}`;
+      
+      // Crear firma para S3 (método simplificado usando fetch directo)
+      const timestamp = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
+      const dateStamp = timestamp.substring(0, 8);
+      const credentialScope = `${dateStamp}/${S3_REGION}/s3/aws4_request`;
+      
+      // Para simplificar, usar el método de presigned URL del backend
+      console.log('📤 [S3] Requesting S3 upload from backend...');
+      
+      // Crear FormData para enviar al backend S3
+      const s3FormData = new FormData();
+      s3FormData.append('file', file);
+      s3FormData.append('filename', nuevoNombre);
+      s3FormData.append('folder', 'documentos');
 
-    // Enviar metadata al backend con timeout y mejor manejo de errores
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
-    
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-    const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/upload`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader
-      },
-      body: JSON.stringify(documentData),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
+      const authHeader = request.headers.get('Authorization') || '';
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      
+      // Subir archivo a S3 a través del backend
+      const s3Response = await fetch(`${backendUrl}/api/bienestar/documentos/api/documents/upload-file`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader
+        },
+        body: s3FormData
+      });
 
-    if (!backendResponse.ok) {
-      const errorData = await backendResponse.text();
-      console.error('❌ [UPLOAD] Backend error:', {
-        status: backendResponse.status,
-        statusText: backendResponse.statusText,
-        error: errorData
+      if (!s3Response.ok) {
+        const s3Error = await s3Response.text();
+        console.error('❌ [S3] Upload failed:', s3Error);
+        return NextResponse.json({ error: 'Error al subir archivo a S3' }, { status: 500 });
+      }
+
+      const s3Result = await s3Response.json();
+      const s3Url = s3Result.url;
+      
+      console.log(`✅ [S3] File uploaded successfully: ${s3Url}`);
+
+      // === ENVIAR METADATOS AL BACKEND ===
+      // Preparar datos para enviar al backend (con URL de S3)
+      const documentData = {
+        titulo,
+        descripcion,
+        categoria_id: parseInt(categoria_id),
+        etiquetas: etiquetas ? etiquetas.split(',').map(id => parseInt(id)) : [],
+        es_publico,
+        autor,
+        grupo,
+        nombre_archivo: file.name, // Nombre original
+        ruta_archivo: s3Url,       // URL de S3 completa
+        tipo_mime: file.type,
+        tamaño_archivo: file.size
+      };
+
+      console.log('📤 [UPLOAD] Sending metadata to backend...');
+      console.log('📋 [UPLOAD] Document data:', JSON.stringify(documentData, null, 2));
+
+      // Enviar metadata al backend con timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        },
+        body: JSON.stringify(documentData),
+        signal: controller.signal
       });
       
-      // Mantener archivo si es error de autorización (puede resolverse re-logueando)
-      if (backendResponse.status !== 401) {
-        try {
-          const fs = await import('fs/promises');
-          await fs.unlink(filePath);
-          console.log('🗑️ [UPLOAD] Cleaned up local file due to backend error');
-        } catch (cleanupError) {
-          console.error('❌ [UPLOAD] Error cleaning up file:', cleanupError);
+      clearTimeout(timeoutId);
+
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse.text();
+        console.error('❌ [UPLOAD] Backend error:', {
+          status: backendResponse.status,
+          statusText: backendResponse.statusText,
+          error: errorData
+        });
+        
+        // TODO: Eliminar archivo de S3 si el backend falla
+        console.log('⚠️ [UPLOAD] File uploaded to S3 but backend failed. Consider cleanup.');
+        
+        let errorMessage = 'Error al guardar en la base de datos';
+        if (backendResponse.status === 401) {
+          errorMessage = 'Token de autorización inválido o expirado. Por favor, vuelve a iniciar sesión.';
         }
-      } else {
-        console.log('🔄 [UPLOAD] File preserved due to auth error - user may re-login');
+        
+        return NextResponse.json(
+          { error: errorMessage },
+          { status: backendResponse.status }
+        );
       }
-      
-      let errorMessage = 'Error al guardar en la base de datos';
-      if (backendResponse.status === 401) {
-        errorMessage = 'Token de autorización inválido o expirado. Por favor, vuelve a iniciar sesión.';
-      }
-      
-      return NextResponse.json(
-        { error: errorMessage },
-        { status: backendResponse.status }
-      );
+
+      const resultado = await backendResponse.json();
+      console.log('✅ [UPLOAD] Upload to S3 and backend completed successfully');
+
+      return NextResponse.json({
+        message: 'Archivo subido exitosamente a S3',
+        file: {
+          nombre_original: file.name,
+          nombre_guardado: nuevoNombre,
+          ruta: s3Url,
+          tamaño: file.size,
+          tipo: file.type,
+          storage: 'S3'
+        },
+        documento: resultado
+      });
+
+    } catch (s3Error) {
+      console.error('❌ [S3] Error uploading to S3:', s3Error);
+      return NextResponse.json({ error: 'Error al subir archivo a S3' }, { status: 500 });
     }
-
-    const resultado = await backendResponse.json();
-    console.log('✅ [UPLOAD] Upload completed successfully');
-
-    return NextResponse.json({
-      message: 'Archivo subido exitosamente',
-      file: {
-        nombre_original: file.name,
-        nombre_guardado: nuevoNombre,
-        ruta: `uploads/${nuevoNombre}`,
-        tamaño: file.size,
-        tipo: file.type
-      },
-      documento: resultado
-    });
 
   } catch (error) {
     console.error('❌ [UPLOAD] Error during upload:', error);
@@ -150,11 +199,11 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        errorMessage = 'Timeout: La conexión con el backend tardó demasiado';
+        errorMessage = 'Timeout: La conexión tardó demasiado';
       } else if (error.message.includes('ECONNRESET')) {
-        errorMessage = 'Error de conexión: El backend cerró la conexión inesperadamente';
+        errorMessage = 'Error de conexión: El servidor cerró la conexión inesperadamente';
       } else if (error.message.includes('fetch failed')) {
-        errorMessage = 'Error de red: No se pudo conectar con el backend';
+        errorMessage = 'Error de red: No se pudo conectar con el servidor';
       } else {
         errorMessage = `Error: ${error.message}`;
       }
