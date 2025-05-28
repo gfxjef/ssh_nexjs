@@ -25,7 +25,7 @@ export default function FeaturedPostsSlider({
   intervalMs = 5000
 }: FeaturedPostsSliderProps) {
   const router = useRouter();
-  const { posts, loading } = usePosts();
+  const { posts, loading, categories } = usePosts();
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
   
   useEffect(() => {
@@ -36,6 +36,12 @@ export default function FeaturedPostsSlider({
     
     setFeaturedPosts(filtered);
   }, [posts, maxPosts]);
+  
+  // Obtener color de la categoría
+  const obtenerColorCategoria = (categoriaId: number) => {
+    const categoria = categories.find(cat => cat.id === categoriaId);
+    return categoria ? categoria.color : '#2e3954';
+  };
   
   const handleReadMore = (postId: number) => {
     router.push(`/dashboard/bienestar/posts/${postId}`);
@@ -108,7 +114,10 @@ export default function FeaturedPostsSlider({
                 {/* Contenido inferior - Categoría y botón */}
                 <div className="text-left max-w-lg">
                   <div className="mb-4">
-                    <span className="inline-block px-4 py-2 bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                    <span 
+                      className="inline-block px-4 py-2 rounded-full text-white text-sm font-medium"
+                      style={{ backgroundColor: obtenerColorCategoria(post.categoriaId) }}
+                    >
                       {post.categoria}
                     </span>
                   </div>

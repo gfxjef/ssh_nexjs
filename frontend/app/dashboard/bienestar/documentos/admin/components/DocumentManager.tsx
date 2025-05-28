@@ -188,12 +188,30 @@ export default function DocumentManager({
     if (!confirmed) return;
     
     try {
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🗑️ Eliminando documento:', document.titulo, '(ID:', document.id, ')');
+      
+      // Usar la API real para eliminar el documento
+      const { documentsApi } = await import('../../lib/api');
+      const result = await documentsApi.deleteDocument(document.id);
+      
+      console.log('✅ Documento eliminado exitosamente:', result);
+      
+      // Llamar al callback para actualizar la lista en el componente padre
       onDocumentDeleted(document.id);
+      
+      // Mostrar mensaje de éxito
+      alert(`Documento "${document.titulo}" eliminado exitosamente`);
+      
     } catch (error) {
-      console.error('Error al eliminar documento:', error);
-      alert('Error al eliminar el documento');
+      console.error('❌ Error al eliminar documento:', error);
+      
+      // Mostrar mensaje de error específico
+      let errorMessage = 'Error al eliminar el documento';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Error: ${errorMessage}`);
     }
   };
 
