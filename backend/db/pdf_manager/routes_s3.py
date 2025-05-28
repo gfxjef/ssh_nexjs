@@ -8,6 +8,7 @@ import logging
 from flask import Blueprint, request, jsonify, send_file, redirect, render_template, url_for
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import requests
 
 from .pdf_processor_s3 import PDFProcessorS3
 from .models import CatalogoManager, EstadoCatalogo, TipoArchivo
@@ -957,32 +958,87 @@ def serve_processed_pdf_files_legacy(filepath):
     try:
         logger.info(f"📁 Solicitando archivo: {filepath}")
         
-        # Si la filepath ya es una URL completa de S3, redirigir directamente
+        # Si la filepath ya es una URL completa de S3, extraer la parte del path
         if filepath.startswith('https://'):
-            logger.info(f"🔗 Redirigiendo a URL S3: {filepath}")
-            return redirect(filepath)
+            # Extraer solo la parte del path después del dominio S3
+            if 'amazonaws.com/' in filepath:
+                s3_key = filepath.split('amazonaws.com/', 1)[1]
+                logger.info(f"🔗 Extrayendo S3 key de URL completa: {s3_key}")
+                return redirect(filepath)
+            else:
+                logger.warning(f"⚠️ URL S3 malformada: {filepath}")
+                return serve_fallback_image("unknown")
         
-        # Buscar el archivo en la base de datos por s3_key
+        # Buscar el archivo en la base de datos por s3_key o nombre
         doc = catalogo_manager.obtener_documento_por_s3_key(filepath)
         
         if doc and doc.get('url_s3'):
-            logger.info(f"✅ Archivo encontrado en BD, redirigiendo a S3: {doc['url_s3']}")
-            return redirect(doc['url_s3'])
+            s3_url = doc['url_s3']
+            logger.info(f"✅ Archivo encontrado en BD: {s3_url}")
+            return redirect(s3_url)
         
-        # Si no se encuentra en BD, intentar construir URL de S3 directamente
-        # Formato esperado: pdf/catalogo_id/archivo.ext
+        # Si no se encuentra en BD, construir URL directa de S3
         s3_url = f"https://redkossodo.s3.us-east-2.amazonaws.com/{filepath}"
-        logger.info(f"🔍 Intentando URL S3 directa: {s3_url}")
+        logger.info(f"🔄 Intentando URL directa S3: {s3_url}")
         
-        # Verificar si el archivo existe en S3 haciendo una redirección
-        return redirect(s3_url)
+        # Validar que la URL parece correcta antes de redirigir
+        if '/pdf/' in filepath or 'thumbnail' in filepath:
+            return redirect(s3_url)
+        
+        # Si no es un archivo reconocido, servir fallback
+        logger.warning(f"⚠️ Archivo no reconocido: {filepath}")
+        filename = filepath.split('/')[-1]
+        return serve_fallback_image(filename)
         
     except Exception as e:
-        logger.error(f"Error sirviendo archivo {filepath}: {str(e)}", exc_info=True)
-        return jsonify({
-            'error': f'Archivo no encontrado: {filepath}',
-            'message': 'El archivo solicitado no está disponible'
-        }), 404
+        logger.error(f"Error sirviendo archivo procesado {filepath}: {str(e)}")
+        filename = filepath.split('/')[-1] if '/' in filepath else filepath
+        return serve_fallback_image(filename)
+
+
+def serve_fallback_image(filename: str):
+    """Sirve una imagen de fallback cuando S3 no está disponible"""
+    try:
+        # Si es un thumbnail, devolver SVG de fallback
+        if 'thumbnail' in filename.lower() or filename.endswith('.webp') or 'pdf' in filename.lower():
+            fallback_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" width="300" height="400">
+            <rect width="300" height="400" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2" rx="8"/>
+            <rect x="40" y="60" width="220" height="280" fill="#e74c3c" rx="12" opacity="0.8"/>
+            <rect x="60" y="100" width="180" height="20" fill="#ffffff" rx="4" opacity="0.9"/>
+            <rect x="60" y="140" width="140" height="15" fill="#ffffff" rx="3" opacity="0.7"/>
+            <rect x="60" y="170" width="160" height="15" fill="#ffffff" rx="3" opacity="0.7"/>
+            <rect x="60" y="200" width="120" height="15" fill="#ffffff" rx="3" opacity="0.7"/>
+            <circle cx="150" cy="270" r="25" fill="#ffffff" opacity="0.3"/>
+            <path d="M140 270 L145 275 L160 260" stroke="#e74c3c" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <text x="150" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#6c757d" font-weight="500">
+                Cargando...
+            </text>
+            <text x="150" y="385" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#adb5bd">
+                PDF temporalmente no disponible
+            </text>
+            </svg>'''
+            
+            from flask import Response
+            return Response(fallback_svg, mimetype='image/svg+xml', headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            })
+        
+        # Para otros archivos, intentar servir desde static local
+        try:
+            static_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'pdf-icon.svg')
+            if os.path.exists(static_path):
+                return send_file(static_path, mimetype='image/svg+xml')
+        except:
+            pass
+        
+        # Último recurso: error 404
+        return "Archivo no encontrado", 404
+        
+    except Exception as e:
+        logger.error(f"Error sirviendo fallback para {filename}: {str(e)}")
+        return "Error interno", 500
 
 
 # ==========================================

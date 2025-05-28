@@ -343,19 +343,36 @@ def serve_global_images(filename):
         if os.path.exists(static_path):
             return send_file(static_path)
         
-        # Si no existe, devolver el icono PDF por defecto
+        # Si es el pdf-icon.svg que falta, crearlo dinámicamente
         if filename == 'pdf-icon.svg':
-            default_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60">
-            <path fill="#e74c3c" d="M12,2H6V22H18V8L12,2Z M12,4L16,8H12V4Z"/>
-            <path fill="#c0392b" d="M9,10H15V12H9V10Z M9,14H15V16H9V14Z M9,18H13V20H9V18Z"/>
+            pdf_icon_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+            <rect x="5" y="5" width="40" height="50" fill="#e74c3c" rx="3" stroke="#c0392b" stroke-width="1"/>
+            <path d="M35 5 L35 15 L45 15 Z" fill="#c0392b"/>
+            <rect x="10" y="20" width="25" height="3" fill="#ffffff" rx="1"/>
+            <rect x="10" y="26" width="20" height="2" fill="#ffffff" rx="1"/>
+            <rect x="10" y="30" width="22" height="2" fill="#ffffff" rx="1"/>
+            <rect x="10" y="34" width="18" height="2" fill="#ffffff" rx="1"/>
+            <text x="22" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#ffffff" font-weight="bold">PDF</text>
             </svg>'''
+            
             from flask import Response
-            return Response(default_svg, mimetype='image/svg+xml')
+            return Response(pdf_icon_svg, mimetype='image/svg+xml', headers={
+                'Cache-Control': 'public, max-age=86400',  # Cache por 24 horas
+                'Content-Type': 'image/svg+xml'
+            })
         
-        return "Archivo no encontrado", 404
+        # Para otros archivos, devolver 404
+        return "Imagen no encontrada", 404
+        
     except Exception as e:
-        print(f"Error sirviendo imagen {filename}: {str(e)}")
-        return "Error interno", 500
+        print(f"Error sirviendo imagen global {filename}: {str(e)}")
+        # Devolver un SVG de fallback genérico
+        fallback_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+        <rect x="5" y="5" width="50" height="50" fill="#cccccc" rx="5"/>
+        <text x="30" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666">?</text>
+        </svg>'''
+        from flask import Response
+        return Response(fallback_svg, mimetype='image/svg+xml')
 
 # Configurar el manejo de archivos estáticos del PDF manager
 @app.route('/api/pdfs/static/<path:filename>')
