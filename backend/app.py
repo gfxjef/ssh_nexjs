@@ -65,7 +65,7 @@ app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
 # Registrar el blueprint del gestor de PDFs
 # app.register_blueprint(pdf_manager_bp) # COMENTADO: Sistema local
 # Registrar el blueprint del gestor de PDFs con S3 (nueva arquitectura)
-app.register_blueprint(pdf_manager_s3_bp, url_prefix='/api/pdfs') # Cambiado el prefijo a /api/pdfs
+app.register_blueprint(pdf_manager_s3_bp) # Removido el url_prefix duplicado
 
 # Registrar el blueprint de marketing (stock)
 app.register_blueprint(stock_bp) # El prefijo ya está en el blueprint (url_prefix='/api/marketing')
