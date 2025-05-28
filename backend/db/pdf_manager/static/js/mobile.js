@@ -89,6 +89,83 @@ $(document).ready(function() {
     pageWidth = 0; pageHeight = 0;
     console.log(`Cargando ${pageCount} imágenes desde ${imagesBaseUrl} (móvil)`);
 
+    // Primero, obtener las URLs de S3 para las páginas del catálogo
+    const catalogName = window.selectedPDF;
+    const paginasApiUrl = AppConfig.getFullPath(`catalogos/nombre/${encodeURIComponent(catalogName)}/paginas`);
+    
+    console.log(`[Mobile] Obteniendo URLs de S3 para catálogo: ${catalogName} desde ${paginasApiUrl}`);
+    
+    fetch(paginasApiUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: No se pudieron obtener las páginas del catálogo`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (!data.success || !data.paginas || data.paginas.length === 0) {
+          throw new Error('No se encontraron páginas para el catálogo');
+        }
+        
+        console.log(`[Mobile] Obtenidas ${data.paginas.length} URLs de S3 para el catálogo`);
+        
+        // Inicializar array de páginas
+        canvasPages = new Array(data.paginas.length);
+        
+        // Cargar cada imagen desde su URL de S3
+        data.paginas.forEach((pagina, index) => {
+          const img = new Image();
+          
+          img.onload = function() {
+            imagesLoaded++;
+            console.log(`[Mobile] Imagen ${pagina.numero_pagina}/${data.paginas.length} cargada desde S3`);
+            
+            if (index === 0) {
+              pageWidth = this.naturalWidth;
+              pageHeight = this.naturalHeight;
+            }
+            
+            canvasPages[pagina.numero_pagina - 1] = img;
+            
+            if (imagesLoaded === data.paginas.length) {
+              prepareFlipbookMobile(canvasPages, data.paginas.length);
+              hideLoader();
+            }
+          };
+          
+          img.onerror = function() {
+            console.error(`[Mobile] Error al cargar imagen para página ${pagina.numero_pagina} desde S3: ${pagina.url}`);
+            imagesLoaded++;
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-page';
+            errorDiv.innerHTML = `<div class="error-message">Error P.${pagina.numero_pagina}</div>`;
+            canvasPages[pagina.numero_pagina - 1] = errorDiv;
+            
+            if (imagesLoaded === data.paginas.length) {
+              prepareFlipbookMobile(canvasPages, data.paginas.length);
+              hideLoader();
+            }
+          };
+          
+          // Usar la URL directa de S3
+          img.src = pagina.url;
+        });
+      })
+      .catch(error => {
+        console.error('[Mobile] Error al obtener URLs de S3:', error);
+        // Fallback: intentar con el método anterior
+        console.log('[Mobile] Intentando fallback con URLs locales...');
+        loadPrerenderedImagesLegacy(imagesBaseUrl, pageCount);
+      });
+  }
+  
+  // Función legacy como fallback
+  function loadPrerenderedImagesLegacy(imagesBaseUrl, pageCount) {
+    let imagesLoaded = 0;
+    pageWidth = 0; pageHeight = 0;
+    console.log(`[LEGACY Mobile] Cargando ${pageCount} imágenes desde ${imagesBaseUrl}`);
+
     for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
       const img = new Image();
       img.onload = function() {

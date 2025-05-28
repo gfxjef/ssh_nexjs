@@ -969,6 +969,49 @@ def serve_processed_pdf_files_legacy(filepath):
                 logger.warning(f"⚠️ URL S3 malformada: {filepath}")
                 return serve_fallback_image("unknown")
         
+        # Manejar solicitudes de páginas individuales (ej: CX23/page_1.webp)
+        if '/' in filepath and 'page_' in filepath:
+            parts = filepath.split('/')
+            if len(parts) == 2:
+                catalogo_nombre = parts[0]
+                archivo_nombre = parts[1]
+                
+                # Extraer número de página
+                if archivo_nombre.startswith('page_') and archivo_nombre.endswith('.webp'):
+                    try:
+                        numero_pagina = int(archivo_nombre.replace('page_', '').replace('.webp', ''))
+                        logger.info(f"🔍 Buscando página {numero_pagina} del catálogo '{catalogo_nombre}'")
+                        
+                        # Buscar catálogo por nombre
+                        catalogos = catalogo_manager.buscar_catalogos(catalogo_nombre)
+                        
+                        if catalogos:
+                            # Buscar coincidencia exacta
+                            catalogo_encontrado = None
+                            for cat in catalogos:
+                                if cat['nombre'] == catalogo_nombre:
+                                    catalogo_encontrado = cat
+                                    break
+                            
+                            if catalogo_encontrado:
+                                catalogo_id = catalogo_encontrado['id']
+                                
+                                # Obtener páginas del catálogo
+                                paginas = catalogo_manager.obtener_paginas_catalogo(catalogo_id)
+                                
+                                # Buscar la página específica
+                                for pagina in paginas:
+                                    if pagina['numero_pagina'] == numero_pagina:
+                                        s3_url = pagina['url_s3']
+                                        logger.info(f"✅ Página encontrada, redirigiendo a: {s3_url}")
+                                        return redirect(s3_url)
+                                
+                                logger.warning(f"⚠️ Página {numero_pagina} no encontrada para catálogo '{catalogo_nombre}'")
+                            else:
+                                logger.warning(f"⚠️ Catálogo '{catalogo_nombre}' no encontrado")
+                    except ValueError:
+                        logger.warning(f"⚠️ No se pudo extraer número de página de: {archivo_nombre}")
+        
         # Buscar el archivo en la base de datos por s3_key o nombre
         doc = catalogo_manager.obtener_documento_por_s3_key(filepath)
         
@@ -982,7 +1025,7 @@ def serve_processed_pdf_files_legacy(filepath):
         logger.info(f"🔄 Intentando URL directa S3: {s3_url}")
         
         # Validar que la URL parece correcta antes de redirigir
-        if '/pdf/' in filepath or 'thumbnail' in filepath:
+        if '/pdf/' in filepath or 'thumbnail' in filepath or 'page_' in filepath:
             return redirect(s3_url)
         
         # Si no es un archivo reconocido, servir fallback
@@ -1114,4 +1157,70 @@ def api_docs():
         }
     }
     
-    return jsonify(docs), 200 
+    return jsonify(docs), 200
+
+
+@pdf_manager_s3_bp.route('/catalogos/nombre/<nombre>/paginas', methods=['GET'])
+def get_paginas_catalogo_por_nombre(nombre):
+    """Obtiene todas las páginas de un catálogo por su nombre"""
+    try:
+        logger.info(f"📖 Buscando páginas para catálogo: {nombre}")
+        
+        # Buscar catálogo por nombre exacto
+        catalogos = catalogo_manager.buscar_catalogos(nombre)
+        
+        if not catalogos:
+            return jsonify({
+                'success': False,
+                'error': f'Catálogo "{nombre}" no encontrado'
+            }), 404
+        
+        # Buscar coincidencia exacta
+        catalogo_encontrado = None
+        for cat in catalogos:
+            if cat['nombre'] == nombre:
+                catalogo_encontrado = cat
+                break
+        
+        if not catalogo_encontrado:
+            # Si no hay coincidencia exacta, usar el primero
+            catalogo_encontrado = catalogos[0]
+            logger.warning(f"⚠️ No se encontró coincidencia exacta para '{nombre}', usando: {catalogo_encontrado['nombre']}")
+        
+        catalogo_id = catalogo_encontrado['id']
+        
+        # Obtener páginas del catálogo
+        paginas = catalogo_manager.obtener_paginas_catalogo(catalogo_id)
+        
+        if not paginas:
+            return jsonify({
+                'success': False,
+                'error': f'No se encontraron páginas para el catálogo "{nombre}"'
+            }), 404
+        
+        # Formatear respuesta con URLs directas de S3
+        paginas_formateadas = []
+        for pagina in paginas:
+            paginas_formateadas.append({
+                'numero_pagina': pagina['numero_pagina'],
+                'url': pagina['url_s3'],  # URL directa de S3
+                's3_key': pagina['s3_key'],
+                'tamaño': pagina['tamaño_archivo']
+            })
+        
+        logger.info(f"✅ Devolviendo {len(paginas_formateadas)} páginas para catálogo '{nombre}'")
+        
+        return jsonify({
+            'success': True,
+            'catalogo_id': catalogo_id,
+            'nombre': catalogo_encontrado['nombre'],
+            'total_paginas': len(paginas_formateadas),
+            'paginas': paginas_formateadas
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo páginas del catálogo '{nombre}': {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 
