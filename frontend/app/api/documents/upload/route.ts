@@ -56,93 +56,34 @@ export async function POST(request: NextRequest) {
     
     console.log(`📝 [UPLOAD] New S3 filename format: ${nuevoNombre}`);
 
-    // === SUBIR ARCHIVO A S3 ===
+    // === ENVIAR ARCHIVO Y METADATOS AL BACKEND S3 ===
     try {
-      // Configuración de S3
-      const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
-      const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
-      const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
-      const S3_REGION = process.env.S3_REGION || 'us-east-2';
-
-      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !S3_BUCKET_NAME) {
-        console.error('❌ [S3] Missing S3 configuration environment variables');
-        return NextResponse.json({ error: 'Configuración de S3 no disponible' }, { status: 500 });
-      }
-
-      // Convertir archivo a buffer
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      // Preparar parámetros para S3
-      const s3Key = `documentos/${nuevoNombre}`;
-      
-      // Crear firma para S3 (método simplificado usando fetch directo)
-      const timestamp = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
-      const dateStamp = timestamp.substring(0, 8);
-      const credentialScope = `${dateStamp}/${S3_REGION}/s3/aws4_request`;
-      
-      // Para simplificar, usar el método de presigned URL del backend
-      console.log('📤 [S3] Requesting S3 upload from backend...');
-      
-      // Crear FormData para enviar al backend S3
-      const s3FormData = new FormData();
-      s3FormData.append('file', file);
-      s3FormData.append('filename', nuevoNombre);
-      s3FormData.append('folder', 'documentos');
-
       const authHeader = request.headers.get('Authorization') || '';
       const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
       
+      // Crear FormData para enviar al backend S3 (archivo + metadatos en una sola llamada)
+      const s3FormData = new FormData();
+      s3FormData.append('file', file);
+      s3FormData.append('titulo', titulo);
+      s3FormData.append('descripcion', descripcion);
+      s3FormData.append('categoria_id', categoria_id);
+      s3FormData.append('etiquetas', etiquetas);
+      s3FormData.append('es_publico', es_publico.toString());
+      s3FormData.append('autor', autor);
+      s3FormData.append('grupo', grupo);
+
+      console.log('📤 [S3] Uploading file and metadata to S3 backend...');
+      
       // Subir archivo a S3 a través del backend
-      const s3Response = await fetch(`${backendUrl}/api/bienestar/documentos/api/documents/upload-file`, {
-        method: 'POST',
-        headers: {
-          'Authorization': authHeader
-        },
-        body: s3FormData
-      });
-
-      if (!s3Response.ok) {
-        const s3Error = await s3Response.text();
-        console.error('❌ [S3] Upload failed:', s3Error);
-        return NextResponse.json({ error: 'Error al subir archivo a S3' }, { status: 500 });
-      }
-
-      const s3Result = await s3Response.json();
-      const s3Url = s3Result.url;
-      
-      console.log(`✅ [S3] File uploaded successfully: ${s3Url}`);
-
-      // === ENVIAR METADATOS AL BACKEND ===
-      // Preparar datos para enviar al backend (con URL de S3)
-      const documentData = {
-        titulo,
-        descripcion,
-        categoria_id: parseInt(categoria_id),
-        etiquetas: etiquetas ? etiquetas.split(',').map(id => parseInt(id)) : [],
-        es_publico,
-        autor,
-        grupo,
-        nombre_archivo: file.name, // Nombre original
-        ruta_archivo: s3Url,       // URL de S3 completa
-        tipo_mime: file.type,
-        tamaño_archivo: file.size
-      };
-
-      console.log('📤 [UPLOAD] Sending metadata to backend...');
-      console.log('📋 [UPLOAD] Document data:', JSON.stringify(documentData, null, 2));
-
-      // Enviar metadata al backend con timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos para archivos grandes
       
-      const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/upload`, {
+      const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/api/documents/create-with-file`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': authHeader
         },
-        body: JSON.stringify(documentData),
+        body: s3FormData,
         signal: controller.signal
       });
       
@@ -150,16 +91,13 @@ export async function POST(request: NextRequest) {
 
       if (!backendResponse.ok) {
         const errorData = await backendResponse.text();
-        console.error('❌ [UPLOAD] Backend error:', {
+        console.error('❌ [UPLOAD] Backend S3 error:', {
           status: backendResponse.status,
           statusText: backendResponse.statusText,
           error: errorData
         });
         
-        // TODO: Eliminar archivo de S3 si el backend falla
-        console.log('⚠️ [UPLOAD] File uploaded to S3 but backend failed. Consider cleanup.');
-        
-        let errorMessage = 'Error al guardar en la base de datos';
+        let errorMessage = 'Error al subir archivo a S3';
         if (backendResponse.status === 401) {
           errorMessage = 'Token de autorización inválido o expirado. Por favor, vuelve a iniciar sesión.';
         }
@@ -171,14 +109,14 @@ export async function POST(request: NextRequest) {
       }
 
       const resultado = await backendResponse.json();
-      console.log('✅ [UPLOAD] Upload to S3 and backend completed successfully');
+      console.log('✅ [UPLOAD] Upload to S3 completed successfully:', resultado);
 
       return NextResponse.json({
         message: 'Archivo subido exitosamente a S3',
         file: {
           nombre_original: file.name,
           nombre_guardado: nuevoNombre,
-          ruta: s3Url,
+          ruta: resultado.url || resultado.ruta_archivo,
           tamaño: file.size,
           tipo: file.type,
           storage: 'S3'
@@ -188,7 +126,17 @@ export async function POST(request: NextRequest) {
 
     } catch (s3Error) {
       console.error('❌ [S3] Error uploading to S3:', s3Error);
-      return NextResponse.json({ error: 'Error al subir archivo a S3' }, { status: 500 });
+      
+      let errorMessage = 'Error al subir archivo a S3';
+      if (s3Error instanceof Error) {
+        if (s3Error.name === 'AbortError') {
+          errorMessage = 'Timeout: La subida tardó demasiado (máximo 60 segundos)';
+        } else if (s3Error.message.includes('fetch failed')) {
+          errorMessage = 'Error de conexión con el servidor S3';
+        }
+      }
+      
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 
   } catch (error) {
