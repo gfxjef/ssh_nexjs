@@ -218,15 +218,10 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Cargar PDF.js desde CDN como primario
             if (typeof pdfjsLib === 'undefined') {
-                await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js', AppConfig.getStaticPath('js/pdf.min.js'));
-                // Asegurar que el workerSrc también use CDN si pdf.min.js se cargó de CDN
-                // o la ruta local correspondiente si se usó el fallback.
-                if (window.pdfjsLib.GlobalWorkerOptions.workerSrc.includes('cdnjs')) {
-                     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-                } else {
-                     window.pdfjsLib.GlobalWorkerOptions.workerSrc = AppConfig.getStaticPath('js/pdf.worker.min.js');
-                }
-                console.log("PDF.js workerSrc set to:", window.pdfjsLib.GlobalWorkerOptions.workerSrc);
+                await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', AppConfig.getStaticPath('js/pdf.min.js'));
+                // Configurar el worker
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                console.log("PDF.js cargado y worker configurado");
             }
 
             // Cargar jQuery y luego Turn.js
