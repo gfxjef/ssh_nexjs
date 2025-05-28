@@ -16,8 +16,7 @@ from db.bienestar.documentos import documentos_bp
 from db.encuestas import encuestas_bp, init_encuestas_db
 
 # Importar el blueprint del gestor de PDFs
-from db.pdf_manager import pdf_manager_bp, init_pdf_module
-
+# from db.pdf_manager import pdf_manager_bp, init_pdf_module # COMENTADO: Sistema local
 # Importar el blueprint del gestor de PDFs con S3 (nueva arquitectura)
 from db.pdf_manager.routes_s3 import pdf_manager_s3_bp
 
@@ -63,10 +62,9 @@ app.register_blueprint(documentos_bp)
 app.register_blueprint(encuestas_bp, url_prefix='/api/encuestas')
 
 # Registrar el blueprint del gestor de PDFs
-app.register_blueprint(pdf_manager_bp) # El prefijo ya está en el blueprint
-
+# app.register_blueprint(pdf_manager_bp) # COMENTADO: Sistema local
 # Registrar el blueprint del gestor de PDFs con S3 (nueva arquitectura)
-app.register_blueprint(pdf_manager_s3_bp, url_prefix='/pdf-manager-s3')
+app.register_blueprint(pdf_manager_s3_bp, url_prefix='/api/pdfs') # Cambiado el prefijo a /api/pdfs
 
 # Registrar el blueprint de marketing (stock)
 app.register_blueprint(stock_bp) # El prefijo ya está en el blueprint (url_prefix='/api/marketing')
@@ -85,9 +83,10 @@ with app.app_context(): # Asegurarse de que se ejecuta en el contexto de la apli
     print("APP: init_encuestas_db() finalizado.")
 
     # Inicializar el módulo PDF (crear directorios y el procesador)
-    print("APP: Llamando a init_pdf_module()")
-    init_pdf_module(app) # Pasar la instancia de la app
-    print("APP: init_pdf_module() finalizado.")
+    # print("APP: Llamando a init_pdf_module()") # COMENTADO: Inicialización del sistema local
+    # init_pdf_module(app) # COMENTADO: Inicialización del sistema local
+    # print("APP: init_pdf_module() finalizado.") # COMENTADO
+    print("PDF_MANAGER: Configurado para usar S3. No se requiere init_pdf_module() local.")
 
 # Authentication routes
 @app.route('/api/auth/login', methods=['POST'])
