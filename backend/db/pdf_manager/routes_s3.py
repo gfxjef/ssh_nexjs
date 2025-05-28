@@ -462,22 +462,297 @@ def list_legacy():
 
 @pdf_manager_s3_bp.route('/upload-page', methods=['GET'])
 def upload_page_route():
-    """Página para subir PDFs - Compatibilidad con sistema anterior"""
+    """Página para subir PDFs - Sirve HTML simple"""
     try:
-        # En lugar de servir una página HTML, devolvemos información sobre el endpoint de upload
-        return jsonify({
-            'message': 'Sistema S3 activo',
-            'upload_endpoint': '/api/pdfs/upload',
-            'method': 'POST',
-            'content_type': 'multipart/form-data',
-            'required_fields': {
-                'file': 'Archivo PDF (requerido)',
-                'descripcion': 'Descripción del catálogo (opcional)',
-                'categoria': 'Categoría del catálogo (opcional, default: general)',
-                'usuario_id': 'ID del usuario (opcional)'
-            },
-            'example_curl': 'curl -X POST /api/pdfs/upload -F "file=@documento.pdf" -F "descripcion=Mi catálogo"'
-        }), 200
+        # Crear una página HTML simple que replique la funcionalidad
+        html_content = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subir Nuevo Catálogo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #fafafa;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        .file-icon {
+            font-size: 48px;
+            color: #ccc;
+            margin-bottom: 10px;
+        }
+        .upload-text {
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .file-limit {
+            color: #999;
+            font-size: 14px;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .btn {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background-color: #218838;
+        }
+        .btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .progress {
+            display: none;
+            margin-top: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="javascript:history.back()" class="back-link">← Volver al Catálogo</a>
+        
+        <h1>Subir Nuevo Catálogo</h1>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Selecciona un archivo PDF:</label>
+                <div class="upload-area" onclick="document.getElementById('file').click()">
+                    <div class="file-icon">📄</div>
+                    <div class="upload-text">Arrastra un archivo PDF aquí o haz clic para seleccionar</div>
+                    <div class="file-limit">Máximo 50MB</div>
+                </div>
+                <input type="file" id="file" name="file" accept=".pdf" style="display: none;" required>
+                <div id="fileName" style="margin-top: 10px; color: #666;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="descripcion">Descripción (opcional):</label>
+                <textarea id="descripcion" name="descripcion" placeholder="Describe el contenido del catálogo..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="categoria">Categoría:</label>
+                <select id="categoria" name="categoria">
+                    <option value="general">General</option>
+                    <option value="productos">Productos</option>
+                    <option value="servicios">Servicios</option>
+                    <option value="promociones">Promociones</option>
+                    <option value="manuales">Manuales</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">Subir y Procesar</button>
+        </form>
+        
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="progressText" style="text-align: center; margin-top: 5px;">Procesando...</div>
+        </div>
+        
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file');
+        const fileName = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const message = document.getElementById('message');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileName.textContent = `Archivo seleccionado: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('Por favor selecciona un archivo PDF', 'error');
+                return;
+            }
+            
+            if (file.size > 50 * 1024 * 1024) {
+                showMessage('El archivo es demasiado grande. Máximo 50MB permitido.', 'error');
+                return;
+            }
+            
+            formData.append('file', file);
+            formData.append('descripcion', document.getElementById('descripcion').value);
+            formData.append('categoria', document.getElementById('categoria').value);
+            
+            submitBtn.disabled = true;
+            progress.style.display = 'block';
+            message.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/pdfs/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(`¡Catálogo "${result.nombre}" procesado exitosamente!`, 'success');
+                    uploadForm.reset();
+                    fileName.textContent = '';
+                    setTimeout(() => {
+                        window.history.back();
+                    }, 2000);
+                } else {
+                    showMessage(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error de conexión: ${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                progress.style.display = 'none';
+            }
+        });
+
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+        }
+
+        // Drag and drop functionality
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#007bff';
+            uploadArea.style.backgroundColor = '#f0f8ff';
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '#fafafa';
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '#fafafa';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                const event = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(event);
+            }
+        });
+    </script>
+</body>
+</html>
+        """
+        
+        from flask import Response
+        return Response(html_content, mimetype='text/html')
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
