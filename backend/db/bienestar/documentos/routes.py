@@ -191,7 +191,7 @@ def upload_document():
             user_id = int(user_id) if user_id else 149
             
             # Insertar documento en BD
-            documento_id = db_ops.execute_query(
+            result = db_ops.execute_query(
                 INSERT_DOCUMENT,
                 (
                     titulo,
@@ -209,7 +209,10 @@ def upload_document():
                 fetch=False
             )
             
-            if not documento_id:
+            # Extraer el ID del documento del resultado
+            if result and isinstance(result, dict) and 'last_insert_id' in result:
+                documento_id = result['last_insert_id']
+            else:
                 return jsonify({'success': False, 'error': 'Error al guardar documento en base de datos'}), 500
             
             # Procesar etiquetas si se proporcionaron
@@ -258,8 +261,7 @@ def upload_document():
                     'titulo': titulo,
                     'nombre_archivo': nombre_archivo,
                     'ruta_archivo': ruta_archivo,
-                    'tamaño': tamaño_archivo,
-                    'archivo_copiado': copy_success
+                    'tamaño': tamaño_archivo
                 }
             })
             
