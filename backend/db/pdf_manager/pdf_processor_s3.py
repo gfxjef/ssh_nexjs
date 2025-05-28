@@ -208,10 +208,9 @@ class PDFProcessorS3:
             
             # Subir a S3
             pdf_file_obj = io.BytesIO(pdf_bytes)
-            success, s3_url, error_msg = self.s3_manager.upload_file(
+            success, s3_url, error_msg = self.s3_manager.upload_file_with_custom_key(
                 pdf_file_obj, 
-                s3_key, 
-                UploadType.PDF
+                s3_key
             )
             
             if not success:
@@ -351,10 +350,9 @@ class PDFProcessorS3:
             
             # Subir a S3
             webp_file_obj = io.BytesIO(webp_bytes)
-            success, s3_url, error_msg = self.s3_manager.upload_file(
+            success, s3_url, error_msg = self.s3_manager.upload_file_with_custom_key(
                 webp_file_obj,
-                s3_key,
-                UploadType.PDF
+                s3_key
             )
             
             if not success:
@@ -442,10 +440,9 @@ class PDFProcessorS3:
             
             # Subir a S3
             thumbnail_file_obj = io.BytesIO(thumbnail_bytes)
-            success, s3_url, error_msg = self.s3_manager.upload_file(
+            success, s3_url, error_msg = self.s3_manager.upload_file_with_custom_key(
                 thumbnail_file_obj,
-                s3_key,
-                UploadType.PDF
+                s3_key
             )
             
             if not success:

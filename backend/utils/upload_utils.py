@@ -151,6 +151,43 @@ class S3UploadManager:
             logger.error(f"Error inesperado subiendo archivo: {str(e)}")
             return False, None, f"Error inesperado: {str(e)}"
 
+    def upload_file_with_custom_key(self, file_data, s3_key: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Sube un archivo a S3 usando un S3 key personalizado completo
+        
+        Args:
+            file_data: Datos del archivo (bytes o file-like object)
+            s3_key: Key S3 completo (incluyendo estructura de carpetas)
+            
+        Returns:
+            Tuple[bool, Optional[str], Optional[str]]: (success, url, error_message)
+        """
+        try:
+            # Usar el S3 key tal como se proporciona (sin agregar prefijos)
+            # Subir archivo a S3
+            self.s3_client.upload_fileobj(
+                file_data,
+                self.bucket_name,
+                s3_key,
+                ExtraArgs={
+                    'ContentType': self._get_content_type(s3_key),
+                    'CacheControl': 'max-age=31536000'  # Cache por 1 año
+                }
+            )
+            
+            # Generar URL pública
+            url = f"https://{self.bucket_name}.s3.{os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')}.amazonaws.com/{s3_key}"
+            
+            logger.info(f"Archivo subido exitosamente a S3 con key personalizado: {s3_key}")
+            return True, url, None
+            
+        except ClientError as e:
+            logger.error(f"Error subiendo archivo a S3: {str(e)}")
+            return False, None, f"Error subiendo archivo: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error inesperado subiendo archivo: {str(e)}")
+            return False, None, f"Error inesperado: {str(e)}"
+
     def delete_file(self, file_url: str) -> bool:
         """
         Elimina un archivo de S3 basado en su URL

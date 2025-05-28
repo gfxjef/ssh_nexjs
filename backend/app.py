@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, send_from_directory, current_app
 from flask_cors import CORS
 import jwt
 import hashlib
@@ -332,6 +332,41 @@ def serve_uploaded_file(filename):
     except Exception as e:
         print(f"Error al servir archivo {filename}: {str(e)}")
         return jsonify({'error': 'Error interno del servidor'}), 500
+
+# Configurar el manejo de archivos estáticos globales
+@app.route('/images/<path:filename>')
+def serve_global_images(filename):
+    """Sirve archivos de imágenes globales"""
+    try:
+        # Buscar primero en la carpeta de pdf_manager
+        static_path = os.path.join(current_app.root_path, 'db', 'pdf_manager', 'static', 'images', filename)
+        if os.path.exists(static_path):
+            return send_file(static_path)
+        
+        # Si no existe, devolver el icono PDF por defecto
+        if filename == 'pdf-icon.svg':
+            default_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60">
+            <path fill="#e74c3c" d="M12,2H6V22H18V8L12,2Z M12,4L16,8H12V4Z"/>
+            <path fill="#c0392b" d="M9,10H15V12H9V10Z M9,14H15V16H9V14Z M9,18H13V20H9V18Z"/>
+            </svg>'''
+            from flask import Response
+            return Response(default_svg, mimetype='image/svg+xml')
+        
+        return "Archivo no encontrado", 404
+    except Exception as e:
+        print(f"Error sirviendo imagen {filename}: {str(e)}")
+        return "Error interno", 500
+
+# Configurar el manejo de archivos estáticos del PDF manager
+@app.route('/api/pdfs/static/<path:filename>')
+def serve_pdf_static(filename):
+    """Sirve archivos estáticos del PDF manager"""
+    try:
+        static_path = os.path.join(current_app.root_path, 'db', 'pdf_manager', 'static')
+        return send_from_directory(static_path, filename)
+    except Exception as e:
+        print(f"Error sirviendo archivo estático {filename}: {str(e)}")
+        return "Archivo no encontrado", 404
 
 # Run the app
 if __name__ == '__main__':
