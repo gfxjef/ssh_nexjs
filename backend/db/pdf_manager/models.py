@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
-from ...mysql_connection import MySQLConnection
+from mysql_connection import MySQLConnection
 
 
 class EstadoCatalogo(Enum):

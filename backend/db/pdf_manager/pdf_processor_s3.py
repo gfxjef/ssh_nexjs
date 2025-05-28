@@ -17,7 +17,7 @@ from .models import (
     CatalogoManager, Catalogo, CatalogoDoc, 
     EstadoCatalogo, TipoArchivo, EstadoArchivo
 )
-from ...utils.upload_utils import S3UploadManager, UploadType
+from utils.upload_utils import S3UploadManager, UploadType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
