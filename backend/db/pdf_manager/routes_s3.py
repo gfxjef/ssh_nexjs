@@ -838,49 +838,39 @@ def listar_pdfs_procesados_api():
                 'pages': catalogo.get('total_paginas', 0),
                 'status': catalogo.get('estado', 'unknown'),
                 'created': catalogo.get('fecha_creacion', ''),
-                'size': catalogo.get('tamaño_archivo', 0),
-                'has_images': catalogo.get('total_paginas', 0) > 0,
-                'original_pdf_available': bool(catalogo.get('pdf_url'))
+                'size': catalogo.get('tamaño_archivo', 0)
             }
             
-            # Para compatibilidad con el frontend, necesitamos devolver URLs de S3 directamente
-            # pero el frontend espera que las imágenes de páginas se construyan dinámicamente
-            
-            # Manejar thumbnail - usar URL de S3 directa
+            # Manejar thumbnail - verificar si ya es una URL completa
             thumbnail_url = catalogo.get('thumbnail_url')
-            if thumbnail_url and thumbnail_url.startswith('http'):
-                catalog_info['thumbnail_path_relative'] = thumbnail_url
+            if thumbnail_url:
+                if thumbnail_url.startswith('http'):
+                    # Ya es una URL completa de S3
+                    catalog_info['thumbnail_path_relative'] = thumbnail_url
+                else:
+                    # Es una ruta relativa, construir URL completa
+                    catalog_info['thumbnail_path_relative'] = f"/api/pdfs/processed_files/{thumbnail_url}"
             else:
                 catalog_info['thumbnail_path_relative'] = None
             
-            # Manejar PDF original - usar URL de S3 directa
+            # Manejar PDF original
             pdf_url = catalogo.get('pdf_url')
-            if pdf_url and pdf_url.startswith('http'):
-                catalog_info['original_pdf_path_relative'] = pdf_url
+            if pdf_url:
+                if pdf_url.startswith('http'):
+                    # Ya es una URL completa de S3
+                    catalog_info['original_pdf_path_relative'] = pdf_url
+                else:
+                    # Es una ruta relativa
+                    catalog_info['original_pdf_path_relative'] = f"/api/pdfs/processed_files/{pdf_url}"
             else:
                 catalog_info['original_pdf_path_relative'] = None
-            
-            # CLAVE: Para las imágenes de páginas, necesitamos devolver la base S3
-            # El frontend construirá las URLs como: {images_base_path_relative}/page_X.webp
-            # Pero necesitamos que esas URLs apunten a S3, no al servidor local
-            
-            # Obtener el ID del catálogo para construir la base S3
-            catalogo_id = catalogo.get('id')
-            if catalogo_id:
-                # Construir la base S3 para las páginas
-                # Las páginas están en S3 como: pdf/{catalogo_id}/page_X.webp
-                s3_base_url = f"https://redkossodo.s3.us-east-2.amazonaws.com/pdf/{catalogo_id}"
-                catalog_info['images_base_path_relative'] = s3_base_url
-            else:
-                # Fallback: usar el nombre del catálogo
-                catalog_info['images_base_path_relative'] = f"https://redkossodo.s3.us-east-2.amazonaws.com/pdf/{catalogo.get('nombre', '')}"
             
             processed_catalogs.append(catalog_info)
         
         # Ordenar por nombre
         processed_catalogs.sort(key=lambda x: x['name'].lower())
         
-        logger.info(f"✅ Devolviendo {len(processed_catalogs)} catálogos (formato compatibilidad S3)")
+        logger.info(f"✅ Devolviendo {len(processed_catalogs)} catálogos (formato compatibilidad)")
         return jsonify(processed_catalogs)
         
     except Exception as e:
