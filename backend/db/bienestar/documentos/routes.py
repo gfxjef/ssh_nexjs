@@ -2,7 +2,7 @@ import os
 import uuid
 import logging
 from datetime import datetime
-from flask import request, jsonify, send_from_directory, current_app, abort
+from flask import request, jsonify, send_from_directory, current_app, abort, redirect
 from werkzeug.utils import secure_filename
 from urllib.parse import unquote
 import shutil
@@ -1379,12 +1379,13 @@ def delete_tag(tag_id):
 def download_document_api(document_id):
     """
     Endpoint API para descarga segura de documentos.
+    Soporta tanto archivos locales como URLs de S3.
     
     Args:
         document_id (int): ID del documento
         
     Returns:
-        file: Archivo descargado con headers de seguridad
+        file: Archivo descargado con headers de seguridad o redirect a S3
     """
     try:
         db_ops = MySQLConnection()
@@ -1406,26 +1407,6 @@ def download_document_api(document_id):
             # Aquí se podría agregar validación de permisos de usuario más adelante
             logger.warning(f"Intento de acceso a documento privado ID: {document_id}")
         
-        # Verificar que el archivo físico existe
-        # Extraer el nombre real del archivo de la ruta_archivo
-        ruta_completa = doc_data['ruta_archivo']  # uploads/documentos/911f5f33-....txt
-        nombre_fisico = os.path.basename(ruta_completa)  # 911f5f33-....txt
-        
-        upload_dir = get_upload_dir()
-        file_path = os.path.join(upload_dir, nombre_fisico)
-        
-        if not os.path.exists(file_path):
-            logger.error(f"Archivo físico no encontrado: {file_path}")
-            logger.error(f"Ruta en BD: {ruta_completa}, Nombre físico: {nombre_fisico}")
-            return jsonify({'success': False, 'error': 'Archivo no encontrado en el servidor'}), 404
-        
-        # Obtener información del archivo para headers seguros
-        file_size = os.path.getsize(file_path)
-        mime_type = doc_data.get('tipo_mime', 'application/octet-stream')
-        
-        # Nombre original para descarga (usar titulo si no hay nombre_archivo original)
-        download_filename = f"{doc_data['titulo']}.{doc_data['nombre_archivo'].split('.')[-1]}"
-        
         # Incrementar contador de descargas de forma atómica
         db_ops.execute_query(INCREMENT_DOWNLOADS, (document_id,), fetch=False)
         
@@ -1446,27 +1427,58 @@ def download_document_api(document_id):
             fetch=False
         )
         
-        logger.info(f"Descarga autorizada - Documento ID: {document_id}, IP: {client_ip}")
+        # Verificar si es una URL de S3 (nueva forma)
+        ruta_archivo = doc_data['ruta_archivo']
         
-        # Preparar respuesta con headers de seguridad
-        response = send_from_directory(
-            upload_dir,
-            nombre_fisico,  # Usar el nombre físico real del archivo
-            as_attachment=True,
-            download_name=download_filename,
-            mimetype=mime_type
-        )
+        if ruta_archivo and (ruta_archivo.startswith('https://') and 'amazonaws.com' in ruta_archivo):
+            # Es una URL de S3 - redirigir directamente
+            logger.info(f"📁 Redirigiendo descarga a S3: {ruta_archivo}")
+            
+            return redirect(ruta_archivo)
         
-        # Agregar headers de seguridad adicionales
-        response.headers['Content-Length'] = str(file_size)
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        
-        return response
+        else:
+            # Es un archivo local (método anterior) - servir desde el servidor
+            logger.info(f"📁 Sirviendo archivo local: {ruta_archivo}")
+            
+            # Extraer el nombre real del archivo de la ruta_archivo
+            nombre_fisico = os.path.basename(ruta_archivo)  # 911f5f33-....txt
+            
+            upload_dir = get_upload_dir()
+            file_path = os.path.join(upload_dir, nombre_fisico)
+            
+            if not os.path.exists(file_path):
+                logger.error(f"Archivo físico no encontrado: {file_path}")
+                logger.error(f"Ruta en BD: {ruta_archivo}, Nombre físico: {nombre_fisico}")
+                return jsonify({'success': False, 'error': 'Archivo no encontrado en el servidor'}), 404
+            
+            # Obtener información del archivo para headers seguros
+            file_size = os.path.getsize(file_path)
+            mime_type = doc_data.get('tipo_mime', 'application/octet-stream')
+            
+            # Nombre original para descarga (usar titulo si no hay nombre_archivo original)
+            download_filename = f"{doc_data['titulo']}.{doc_data['nombre_archivo'].split('.')[-1]}"
+            
+            logger.info(f"Descarga autorizada - Documento ID: {document_id}, IP: {client_ip}")
+            
+            # Preparar respuesta con headers de seguridad
+            response = send_from_directory(
+                upload_dir,
+                nombre_fisico,  # Usar el nombre físico real del archivo
+                as_attachment=True,
+                download_name=download_filename,
+                mimetype=mime_type
+            )
+            
+            # Agregar headers de seguridad adicionales
+            response.headers['Content-Length'] = str(file_size)
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['X-XSS-Protection'] = '1; mode=block'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            
+            return response
         
     except Exception as e:
         logger.error(f"Error en download_document_api: {str(e)}")
@@ -1961,3 +1973,327 @@ def delete_document_api(document_id):
     except Exception as e:
         logger.error(f"Error en delete_document_api: {str(e)}")
         return jsonify({'success': False, 'error': f'Error al eliminar documento: {str(e)}'}), 500 
+
+@documentos_bp.route('/api/documents/upload-file', methods=['POST'])
+@require_permission('documents.upload')
+def upload_document_file():
+    """
+    Endpoint para subir archivos de documentos usando AWS S3.
+    """
+    try:
+        # Importar nuestro sistema centralizado S3
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'utils'))
+        from upload_utils import UploadManager, UploadType
+        
+        # Verificar token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': 'Token de autorización requerido'}), 401
+        
+        token = auth_header.split(' ')[1]
+        payload = verificar_token(token)
+        if not payload:
+            return jsonify({'success': False, 'error': 'Token inválido'}), 401
+        
+        # Verificar que se envió un archivo
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No se encontró ningún archivo'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
+        
+        # Validar archivo usando el sistema centralizado
+        file_size = len(file.read())
+        file.seek(0)  # Reset file pointer
+        
+        # Detectar MIME type
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(file.filename)
+        if not mime_type:
+            mime_type = file.content_type or 'application/octet-stream'
+        
+        # Validar con UploadManager
+        is_valid, error_msg = UploadManager.validate_file(
+            file_size=file_size,
+            filename=file.filename,
+            mime_type=mime_type,
+            upload_type=UploadType.DOCUMENTOS
+        )
+        
+        if not is_valid:
+            return jsonify({'success': False, 'error': error_msg}), 400
+        
+        # Generar nombre único para S3
+        from datetime import datetime
+        import uuid
+        
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'bin'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        sanitized_name = ''.join(c for c in file.filename.rsplit('.', 1)[0] if c.isalnum() or c in ('_', '-'))[:20]
+        unique_filename = f"doc_{timestamp}_{sanitized_name}_{unique_id}.{file_extension}"
+        
+        # Subir archivo a S3
+        success, s3_url, error_message = UploadManager.upload_file(
+            file_data=file,
+            filename=unique_filename,
+            upload_type=UploadType.DOCUMENTOS
+        )
+        
+        if not success:
+            logger.error(f"❌ Error subiendo a S3: {error_message}")
+            return jsonify({'success': False, 'error': f'Error subiendo archivo: {error_message}'}), 500
+        
+        logger.info(f"✅ Documento subido exitosamente a S3: {s3_url}")
+        
+        return jsonify({
+            'success': True,
+            'url': s3_url,
+            'filename': unique_filename,
+            'original_filename': file.filename,
+            'size': file_size,
+            'mime_type': mime_type,
+            'message': 'Documento subido exitosamente a S3'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error al subir documento: {str(e)}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
+
+@documentos_bp.route('/api/documents/create-with-file', methods=['POST'])
+@require_permission('documents.upload')
+def create_document_with_file():
+    """
+    Endpoint para crear un documento completo con archivo en S3.
+    Combina subida de archivo y creación de metadatos en una sola operación.
+    
+    Form data:
+        file: Archivo a subir
+        titulo: Título del documento
+        descripcion: Descripción del documento
+        categoria_id: ID de la categoría
+        etiquetas: Lista de IDs de etiquetas (JSON string)
+        es_publico: Si el documento es público (true/false)
+        grupo: Grupo empresarial
+        
+    Returns:
+        json: Documento creado con URL de S3
+    """
+    try:
+        # Importar sistema S3
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'utils'))
+        from upload_utils import UploadManager, UploadType
+        import json
+        
+        # Verificar token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': 'Token de autorización requerido'}), 401
+        
+        token = auth_header.split(' ')[1]
+        payload = verificar_token(token)
+        if not payload:
+            return jsonify({'success': False, 'error': 'Token inválido'}), 401
+        
+        # Verificar que se envió un archivo
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No se encontró ningún archivo'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo'}), 400
+        
+        # Obtener metadatos del formulario
+        titulo = request.form.get('titulo', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        categoria_id = request.form.get('categoria_id')
+        etiquetas_json = request.form.get('etiquetas', '[]')
+        es_publico = request.form.get('es_publico', 'true').lower() == 'true'
+        grupo = request.form.get('grupo', 'grupo_kossodo')
+        
+        # Validar metadatos
+        if not titulo:
+            return jsonify({'success': False, 'error': 'El título es requerido'}), 400
+        
+        if len(titulo) > 255:
+            return jsonify({'success': False, 'error': 'El título no puede tener más de 255 caracteres'}), 400
+        
+        if not categoria_id or not categoria_id.isdigit():
+            return jsonify({'success': False, 'error': 'ID de categoría válido es requerido'}), 400
+        
+        categoria_id = int(categoria_id)
+        
+        # Validar grupo empresarial
+        if grupo not in ['kossodo', 'kossomet', 'grupo_kossodo']:
+            return jsonify({'success': False, 'error': 'Grupo empresarial no válido. Debe ser: kossodo, kossomet o grupo_kossodo'}), 400
+        
+        # Parsear etiquetas
+        try:
+            etiquetas = json.loads(etiquetas_json) if etiquetas_json else []
+            if not isinstance(etiquetas, list):
+                etiquetas = []
+        except:
+            etiquetas = []
+        
+        # Validar archivo
+        file_size = len(file.read())
+        file.seek(0)  # Reset file pointer
+        
+        # Detectar MIME type
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(file.filename)
+        if not mime_type:
+            mime_type = file.content_type or 'application/octet-stream'
+        
+        # Validar con UploadManager
+        is_valid, error_msg = UploadManager.validate_file(
+            file_size=file_size,
+            filename=file.filename,
+            mime_type=mime_type,
+            upload_type=UploadType.DOCUMENTOS
+        )
+        
+        if not is_valid:
+            return jsonify({'success': False, 'error': error_msg}), 400
+        
+        # Verificar que la categoría existe
+        db_ops = MySQLConnection()
+        categoria = db_ops.execute_query(
+            "SELECT id FROM categorias_documentos WHERE id = %s", 
+            (categoria_id,)
+        )
+        
+        if not categoria:
+            return jsonify({'success': False, 'error': 'Categoría no encontrada'}), 400
+        
+        # Generar nombre único para S3
+        from datetime import datetime
+        import uuid
+        
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'bin'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        sanitized_name = ''.join(c for c in file.filename.rsplit('.', 1)[0] if c.isalnum() or c in ('_', '-'))[:20]
+        unique_filename = f"doc_{timestamp}_{sanitized_name}_{unique_id}.{file_extension}"
+        
+        # Subir archivo a S3
+        success, s3_url, error_message = UploadManager.upload_file(
+            file_data=file,
+            filename=unique_filename,
+            upload_type=UploadType.DOCUMENTOS
+        )
+        
+        if not success:
+            logger.error(f"❌ Error subiendo a S3: {error_message}")
+            return jsonify({'success': False, 'error': f'Error subiendo archivo: {error_message}'}), 500
+        
+        # Crear documento en base de datos con URL de S3
+        try:
+            # Obtener usuario actual desde el token
+            current_user = get_user_from_token()
+            user_id = current_user.get('id') if current_user else 149
+            user_id = int(user_id) if user_id else 149
+            
+            # Insertar documento en BD con URL de S3
+            documento_id = db_ops.execute_query(
+                INSERT_DOCUMENT,
+                (
+                    titulo,
+                    descripcion,
+                    file.filename,       # nombre_archivo original
+                    s3_url,              # ruta_archivo = URL de S3
+                    file_size,           # tamaño_archivo
+                    mime_type,           # tipo_mime
+                    categoria_id,
+                    user_id,             # subido_por
+                    es_publico,          # es_publico
+                    'activo',            # estado
+                    grupo                # grupo empresarial
+                ),
+                fetch=False
+            )
+            
+            if not documento_id:
+                # Si falla la BD, intentar eliminar el archivo de S3
+                try:
+                    UploadManager.delete_file(s3_url)
+                except:
+                    pass
+                return jsonify({'success': False, 'error': 'Error al guardar documento en base de datos'}), 500
+            
+            # Agregar etiquetas si se proporcionaron
+            if etiquetas:
+                for etiqueta_id in etiquetas:
+                    if isinstance(etiqueta_id, int):
+                        try:
+                            # Verificar que la etiqueta existe
+                            etiqueta = db_ops.execute_query(
+                                "SELECT id FROM etiquetas_documentos WHERE id = %s", 
+                                (etiqueta_id,)
+                            )
+                            
+                            if etiqueta:
+                                # Insertar relación documento-etiqueta
+                                db_ops.execute_query(
+                                    ADD_TAG_TO_DOCUMENT,
+                                    (documento_id, etiqueta_id),
+                                    fetch=False
+                                )
+                        except Exception as tag_error:
+                            logger.warning(f"Error al asignar etiqueta {etiqueta_id} al documento {documento_id}: {tag_error}")
+            
+            # Registrar auditoría
+            db_ops.execute_query(
+                LOG_DOCUMENT_ACTION,
+                (
+                    documento_id,
+                    user_id,
+                    'create_with_file',
+                    request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', '127.0.0.1')),
+                    request.headers.get('User-Agent', 'API'),
+                    f'Documento creado con archivo en S3: {titulo}'
+                ),
+                fetch=False
+            )
+            
+            logger.info(f"✅ Documento creado con archivo S3 - ID: {documento_id}, Título: {titulo}, URL: {s3_url}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Documento creado exitosamente con archivo en S3',
+                'data': {
+                    'id': documento_id,
+                    'titulo': titulo,
+                    'descripcion': descripcion,
+                    'nombre_archivo': file.filename,
+                    'ruta_archivo': s3_url,
+                    'tamaño_archivo': file_size,
+                    'tipo_mime': mime_type,
+                    'categoria_id': categoria_id,
+                    'es_publico': es_publico,
+                    'grupo': grupo,
+                    'etiquetas_asignadas': len([e for e in etiquetas if isinstance(e, int)])
+                }
+            }), 201
+            
+        except Exception as e:
+            logger.error(f"Error en base de datos: {str(e)}")
+            # Intentar eliminar el archivo de S3 si falla la BD
+            try:
+                UploadManager.delete_file(s3_url)
+            except:
+                pass
+            return jsonify({'success': False, 'error': f'Error en base de datos: {str(e)}'}), 500
+        
+    except Exception as e:
+        logger.error(f"❌ Error al crear documento con archivo: {str(e)}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
