@@ -39,10 +39,11 @@ export class MenuAccessManager {
         'Ventas/Encuestas/Registro Calificaciones': ['admin', 'gerente', 'atencion', 'marketing','atencion'],
         
         // Submenús de Bienestar
-        'Bienestar y Talento/Posts': ['admin', 'gerente', 'rrhh', 'invitado', 'asesor','atencion'],
-        'Bienestar y Talento/Administrar Posts': ['admin', 'rrhh'],
+        'Bienestar y Talento/Publicaciones': ['admin', 'gerente', 'rrhh', 'invitado', 'asesor','atencion'],
         'Bienestar y Talento/Documentos': ['admin', 'gerente', 'rrhh', 'atencion'],
-        'Bienestar y Talento/Documentos/Administrador': ['admin', 'rrhh']
+        'Bienestar y Talento/Administración': ['admin', 'rrhh'],
+        'Bienestar y Talento/Administración/Administrar Publicaciones': ['admin', 'rrhh'],
+        'Bienestar y Talento/Administración/Administrar Documentos': ['admin', 'rrhh']
       };
       
       // Permisos para botones específicos

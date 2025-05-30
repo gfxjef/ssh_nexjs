@@ -3,10 +3,11 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import GradientCanvas from '../components/GradientCanvas'; // Importar el componente del canvas
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faLock, faEnvelope } from '@fortawesome/free-solid-svg-icons';
+import { setAuthentication, getReturnUrl, cleanReturnUrl } from '@/lib/auth-utils';
 
 export default function Login() {
   const [credentials, setCredentials] = useState({
@@ -19,6 +20,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pageLoaded, setPageLoaded] = useState(false);
 
   useEffect(() => {
@@ -54,12 +56,17 @@ export default function Login() {
         const data = await response.json();
         console.log('✅ [LOGIN] Login exitoso:', data);
         
-        // Guardar token y datos del usuario en localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.usuario));
+        // Usar la nueva función para establecer autenticación completa
+        setAuthentication(data.token, data.usuario);
         
-        // Redirigir al dashboard
-        router.push('/dashboard');
+        // Obtener la URL de retorno desde query params
+        const returnUrl = getReturnUrl(searchParams || undefined);
+        const cleanUrl = cleanReturnUrl(returnUrl);
+        
+        console.log('🔄 [LOGIN] Redirigiendo a:', cleanUrl);
+        
+        // Redirigir a la URL original o al dashboard
+        router.push(cleanUrl);
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Error al iniciar sesión');
@@ -108,6 +115,14 @@ export default function Login() {
               <h2 className="text-3xl font-semibold text-[#3C4262] mb-7 text-left">Iniciar sesión</h2>
               {error && <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded-md">{error}</div>}
               {successMessage && <div className="mb-4 p-3 text-sm text-green-700 bg-green-100 rounded-md">{successMessage}</div>}
+              
+              {/* Mostrar información de redirección si existe returnUrl */}
+              {searchParams?.get('returnUrl') && (
+                <div className="mb-4 p-3 text-sm text-blue-700 bg-blue-100 rounded-md">
+                  Después del login serás redirigido a la página que intentabas visitar.
+                </div>
+              )}
+              
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="input-group relative">
                   <label htmlFor="usuario" className="block text-sm font-medium text-gray-600 mb-2">Usuario o Correo</label>

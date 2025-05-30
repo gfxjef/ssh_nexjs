@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { usePermissions } from '@/lib/permissions/PermissionsContext';
 import { WithPermission } from '@/lib/permissions/PermissionsContext';
 import { navItemsConfig } from './sidebar';
+import { logout } from '@/lib/auth-utils';
 
 // Definir un tipo para los items de navegación (simplificado)
 interface NavItem {
@@ -50,11 +51,10 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    // Clear token and user from localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    // Usar la nueva función de logout que limpia todo
+    logout();
     
-    // Redirect to login page
+    // Redirigir al login
     router.push('/login');
   };
 

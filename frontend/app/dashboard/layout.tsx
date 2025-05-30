@@ -8,25 +8,35 @@ import Header from '@/app/dashboard/components/header';
 import { PostsProvider } from './bienestar/context/PostsContext';
 import { NotificationsProvider } from './bienestar/context/NotificationsContext';
 import { PermissionsProvider } from '@/lib/permissions/PermissionsContext';
+import { isAuthenticated, syncAuthToken } from '@/lib/auth-utils';
 
 export default function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticatedState, setIsAuthenticatedState] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
+    // Sincronizar tokens entre localStorage y cookies
+    syncAuthToken();
+    
+    // Verificar autenticación usando las nuevas utilidades
+    const authenticated = isAuthenticated();
+    
+    if (!authenticated) {
+      // El middleware ya manejará la redirección con returnUrl
+      // Solo mostramos loading hasta que el middleware redirija
+      console.log('🔒 [DASHBOARD] No autenticado, esperando redirección del middleware...');
+      setIsLoading(true);
+      return;
     } else {
-      setIsAuthenticated(true);
+      setIsAuthenticatedState(true);
+      setIsLoading(false);
+      console.log('✅ [DASHBOARD] Usuario autenticado');
     }
-    setIsLoading(false);
   }, [router]);
 
   if (isLoading) {
@@ -40,8 +50,8 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
-    return null; // Will redirect to login in useEffect
+  if (!isAuthenticatedState) {
+    return null; // El middleware manejará la redirección
   }
 
   return (

@@ -65,11 +65,11 @@ export const navItemsConfig = [
     name: 'Bienestar y Talento',
     icon: <FavoriteIcon />,
     submenus: [
-      { name: 'Posts', href: '/dashboard/bienestar/posts', icon: <DynamicFeedIcon /> },
-      { name: 'Administrar Posts', href: '/dashboard/bienestar/admin-posts', icon: <EditNoteIcon /> },
-      { name: 'Documentos', href: '/dashboard/bienestar/documentos', icon: <DescriptionIcon />, isGrouper: true, children: [
-        { name: 'Visualizar', href: '/dashboard/bienestar/documentos', icon: <VisibilityIcon /> },
-        { name: 'Administrador', href: '/dashboard/bienestar/documentos/admin', icon: <AdminPanelSettingsIcon /> }
+      { name: 'Publicaciones', href: '/dashboard/bienestar/posts', icon: <DynamicFeedIcon /> },
+      { name: 'Documentos', href: '/dashboard/bienestar/documentos', icon: <DescriptionIcon /> },
+      { name: 'Administración', href: '/dashboard/bienestar/administracion', icon: <AdminPanelSettingsIcon />, isGrouper: true, children: [
+        { name: 'Administrar Publicaciones', href: '/dashboard/bienestar/admin-posts', icon: <EditNoteIcon /> },
+        { name: 'Administrar Documentos', href: '/dashboard/bienestar/documentos/admin', icon: <AdminPanelSettingsIcon /> }
       ]}
     ],
   }
