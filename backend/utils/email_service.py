@@ -75,12 +75,12 @@ class EmailService:
                     <td align="center" valign="top" style="padding:20px 0;">
                         <!-- Contenedor principal de 600px -->
                         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-                            <!-- Header -->
+                            <!-- Header con imagen -->
                             <tr>
-                                <td style="padding:30px 40px 20px 40px;text-align:center;border-bottom:3px solid #2e3954;">
-                                    <h1 style="margin:0;color:#2e3954;font-size:28px;font-weight:600;font-family:Arial,sans-serif;">
-                                        🌟 Nuevo Artículo de Bienestar
-                                    </h1>
+                                <td style="padding:0;text-align:center">
+                                    <img src="https://redkossodo.s3.us-east-2.amazonaws.com/extras/headmail.png" 
+                                         alt="Header Kossodo" 
+                                         style="width:100%;max-width:600px;height:auto;display:block;margin:0;">
                                 </td>
                             </tr>
                             
