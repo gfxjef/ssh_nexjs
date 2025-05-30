@@ -169,46 +169,68 @@ class EmailService:
         
         return html_template
     
-    def send_post_notification(self, post_data: dict, category_name: str, recipient_email: str = "jcamacho@kossodo.com") -> bool:
+    def send_post_notification(self, post_data: dict, category_name: str, recipient_emails: list = None) -> bool:
         """
-        Envía notificación de nuevo post publicado.
+        Envía notificación de nuevo post publicado a múltiples destinatarios.
         
         Args:
             post_data (dict): Datos del post
             category_name (str): Nombre de la categoría
-            recipient_email (str): Email del destinatario
+            recipient_emails (list): Lista de emails destinatarios
             
         Returns:
             bool: True si se envió correctamente, False en caso contrario
         """
+        # Destinatarios por defecto
+        if recipient_emails is None:
+            recipient_emails = ["personal@kossodo.com", "personal@kossomet.com"]
+        
         try:
-            # Crear mensaje
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"📝 Nuevo Post: {post_data['titulo']}"
-            msg['From'] = self.email_user
-            msg['To'] = recipient_email
-            
-            # Crear contenido HTML
+            # Crear contenido HTML una sola vez
             html_content = self.create_post_notification_email(post_data, category_name)
-            html_part = MIMEText(html_content, 'html', 'utf-8')
             
-            # Agregar contenido al mensaje
-            msg.attach(html_part)
-            
-            # Conectar y enviar
+            # Conectar al servidor una sola vez
             server = smtplib.SMTP(self.smtp_server, self.smtp_port)
             server.starttls()
             server.login(self.email_user, self.email_password)
             
-            text = msg.as_string()
-            server.sendmail(self.email_user, recipient_email, text)
+            # Enviar a cada destinatario
+            success_count = 0
+            for recipient_email in recipient_emails:
+                try:
+                    # Crear mensaje individual para cada destinatario
+                    msg = MIMEMultipart('alternative')
+                    msg['Subject'] = f"📝 Nuevo Post: {post_data['titulo']}"
+                    msg['From'] = self.email_user
+                    msg['To'] = recipient_email
+                    
+                    # Agregar contenido HTML
+                    html_part = MIMEText(html_content, 'html', 'utf-8')
+                    msg.attach(html_part)
+                    
+                    # Enviar email individual
+                    text = msg.as_string()
+                    server.sendmail(self.email_user, recipient_email, text)
+                    
+                    print(f"✅ Correo enviado exitosamente a {recipient_email} para el post: {post_data['titulo']}")
+                    success_count += 1
+                    
+                except Exception as individual_error:
+                    print(f"❌ Error enviando correo a {recipient_email}: {str(individual_error)}")
+            
+            # Cerrar conexión
             server.quit()
             
-            print(f"✅ Correo enviado exitosamente a {recipient_email} para el post: {post_data['titulo']}")
-            return True
+            # Considerar exitoso si se envió al menos a un destinatario
+            if success_count > 0:
+                print(f"📧 Total enviados: {success_count}/{len(recipient_emails)} emails")
+                return True
+            else:
+                print("❌ No se pudo enviar ningún email")
+                return False
             
         except Exception as e:
-            print(f"❌ Error enviando correo: {str(e)}")
+            print(f"❌ Error general enviando correos: {str(e)}")
             return False
 
 # Instancia global del servicio
