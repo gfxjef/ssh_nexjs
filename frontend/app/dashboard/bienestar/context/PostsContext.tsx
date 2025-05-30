@@ -15,7 +15,8 @@ import {
   updatePost as apiUpdatePost,
   deletePost as apiDeletePost,
   changePostStatus as apiChangePostStatus,
-  togglePostHighlight as apiTogglePostHighlight
+  togglePostHighlight as apiTogglePostHighlight,
+  resendPostEmail as apiResendPostEmail
 } from '../../../../lib/api/bienestarApi';
 import { useNotifications } from './NotificationsContext';
 
@@ -357,6 +358,34 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [showNotification, allPosts]);
 
+  const resendEmail = useCallback(async (id: number): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const currentPost = allPosts.find(p => p.id === id);
+      if (!currentPost) throw new Error("Post no encontrado para re-enviar email");
+      
+      if (currentPost.estado !== 'publicado') {
+        throw new Error("Solo se pueden re-enviar emails de posts publicados");
+      }
+      
+      const result = await apiResendPostEmail(id);
+      
+      if (result.success) {
+        showNotification(`Email re-enviado exitosamente para "${result.post_title}"`, 'success');
+        return true;
+      } else {
+        throw new Error("Error al re-enviar email");
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      showNotification(`Error al re-enviar email: ${errorMsg}`, 'error');
+      console.error("Error en resendEmail:", errorMsg);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [showNotification, allPosts]);
+
   const value = {
     posts: filteredPosts, // Asignar el resultado del useMemo a 'posts' para satisfacer PostsContextType
     allPosts, // Exponer por si es útil en algún componente
@@ -373,7 +402,8 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     setFilters: updateFilters,
     filteredPosts: filteredPosts, // Mantener filteredPosts también por si se usa directamente
     toggleHighlight,
-    changeStatus
+    changeStatus,
+    resendEmail
   };
 
   return (

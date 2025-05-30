@@ -34,6 +34,7 @@ export default function AdminPosts() {
     deletePost, 
     changeStatus, 
     toggleHighlight,
+    resendEmail,
     categories,
   } = usePosts();
   const { showNotification } = useNotifications();
@@ -92,6 +93,22 @@ export default function AdminPosts() {
   // Función para cambiar destacado
   const cambiarDestacado = async (post: Post) => {
     await toggleHighlight(post.id);
+  };
+
+  // Función para re-enviar email
+  const reenviarEmail = async (post: Post) => {
+    if (post.estado !== 'publicado') {
+      showNotification('Solo se pueden re-enviar emails de posts publicados', 'error');
+      return;
+    }
+    
+    const confirmacion = confirm(
+      `¿Estás seguro de que quieres re-enviar el email de notificación para "${post.titulo}"?`
+    );
+    
+    if (confirmacion) {
+      await resendEmail(post.id);
+    }
   };
 
   // Obtener el color de la categoría
@@ -449,6 +466,21 @@ export default function AdminPosts() {
                                   </div>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => reenviarEmail(post)}
+                                className={`${
+                                  post.estado === 'publicado' 
+                                    ? 'text-green-600 hover:text-green-900' 
+                                    : 'text-gray-400 cursor-not-allowed'
+                                }`}
+                                title={post.estado === 'publicado' ? 'Re-enviar email' : 'Solo disponible para posts publicados'}
+                                disabled={post.estado !== 'publicado'}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                                </svg>
+                              </button>
                             </div>
                           </td>
                         </tr>

@@ -552,6 +552,89 @@ def toggle_post_highlight(post_id):
         print(f"ERROR CRÍTICO en toggle_post_highlight(id={post_id}): {str(e)}\n{error_details}")
         return jsonify({'success': False, 'error': f'Error al destacar post {post_id}: {str(e)}'}), 500
 
+@bienestar_bp.route('/posts/<int:post_id>/resend-email', methods=['POST'])
+def resend_post_email(post_id):
+    """
+    Re-envía el email de notificación para un post publicado.
+    
+    Args:
+        post_id (int): ID del post
+        
+    Returns:
+        json: Confirmación de re-envío o error
+    """
+    try:
+        if not EMAIL_SERVICE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'Servicio de email no disponible'
+            }), 503
+        
+        # Verificar si existe el post
+        db_ops = MySQLConnection()
+        existing = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
+        if not existing:
+            return jsonify({
+                'success': False,
+                'error': 'Post no encontrado'
+            }), 404
+        
+        post_data = existing[0]
+        
+        # Verificar que el post esté publicado
+        if post_data['estado'] != PostStatus.PUBLISHED.value:
+            return jsonify({
+                'success': False,
+                'error': 'Solo se pueden re-enviar emails de posts publicados'
+            }), 400
+        
+        try:
+            print(f"📧 [EMAIL-RESEND] Re-enviando notificación para post: {post_id}")
+            
+            # Obtener nombre de la categoría
+            categoria_query = "SELECT nombre FROM categorias_bienestar WHERE id = %s"
+            categoria_result = db_ops.execute_query(categoria_query, (post_data['categoria_id'],))
+            category_name = categoria_result[0]['nombre'] if categoria_result else "Sin categoría"
+            
+            # Re-enviar email de notificación
+            email_success = email_service.send_post_notification(
+                post_data=post_data,
+                category_name=category_name
+            )
+            
+            if email_success:
+                # Actualizar la marca de email enviado en la base de datos
+                db_ops.execute_query(
+                    UPDATE_POST_EMAIL_SENT,
+                    (True, post_id),
+                    fetch=False
+                )
+                
+                print(f"✅ [EMAIL-RESEND] Notificación re-enviada exitosamente para post {post_id}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Email de notificación re-enviado correctamente',
+                    'post_title': post_data['titulo']
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Error al re-enviar el email de notificación'
+                }), 500
+                
+        except Exception as email_error:
+            print(f"❌ [EMAIL-RESEND] Error al re-enviar notificación para post {post_id}: {str(email_error)}")
+            return jsonify({
+                'success': False,
+                'error': f'Error en el servicio de email: {str(email_error)}'
+            }), 500
+        
+    except Exception as e:
+        error_details = traceback.format_exc()
+        print(f"ERROR CRÍTICO en resend_post_email(id={post_id}): {str(e)}\n{error_details}")
+        return jsonify({'success': False, 'error': f'Error al re-enviar email para post {post_id}: {str(e)}'}), 500
+
 @bienestar_bp.route('/posts/<int:post_id>', methods=['DELETE'])
 def delete_post(post_id):
     """

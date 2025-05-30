@@ -49,170 +49,120 @@ class EmailService:
         # URL del post
         post_url = f"{self.frontend_base_url}/dashboard/bienestar/posts/{post_data['id']}"
         
-        # Imagen del post (si existe)
-        image_section = ""
-        if post_data.get('imagen_url'):
-            image_section = f"""
-            <div style="text-align: center; margin-bottom: 20px;">
-                <img src="{post_data['imagen_url']}" alt="{post_data['titulo']}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            </div>
-            """
-        
-        # Template HTML del correo
+        # Template HTML del correo optimizado para 600px y compatibilidad con clientes de email
         html_template = f"""
-        <!DOCTYPE html>
-        <html lang="es">
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" lang="es">
         <head>
-            <meta charset="UTF-8">
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Nuevo Post: {post_data['titulo']}</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    max-width: 600px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    background-color: #f8f9fa;
-                }}
-                .container {{
-                    background-color: white;
-                    border-radius: 12px;
-                    padding: 30px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                }}
-                .header {{
-                    text-align: center;
-                    margin-bottom: 30px;
-                    padding-bottom: 20px;
-                    border-bottom: 3px solid #2e3954;
-                }}
-                .header h1 {{
-                    color: #2e3954;
-                    margin: 0;
-                    font-size: 24px;
-                    font-weight: 600;
-                }}
-                .post-title {{
-                    color: #2e3954;
-                    font-size: 22px;
-                    font-weight: bold;
-                    margin: 20px 0 15px 0;
-                    line-height: 1.3;
-                }}
-                .post-meta {{
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 20px;
-                    flex-wrap: wrap;
-                    gap: 10px;
-                }}
-                .author {{
-                    color: #666;
-                    font-size: 14px;
-                    font-weight: 500;
-                }}
-                .category-badge {{
-                    background-color: #2e3954;
-                    color: white;
-                    padding: 4px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    font-weight: 500;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }}
-                .content {{
-                    color: #555;
-                    font-size: 16px;
-                    line-height: 1.7;
-                    margin-bottom: 25px;
-                    text-align: justify;
-                }}
-                .read-more {{
-                    text-align: center;
-                    margin: 30px 0;
-                }}
-                .btn {{
-                    display: inline-block;
-                    background: linear-gradient(135deg, #2e3954 0%, #4a5568 100%);
-                    color: white;
-                    text-decoration: none;
-                    padding: 14px 30px;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    font-size: 16px;
-                    transition: transform 0.2s ease;
-                    box-shadow: 0 4px 12px rgba(46, 57, 84, 0.3);
-                }}
-                .btn:hover {{
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 16px rgba(46, 57, 84, 0.4);
-                }}
-                .footer {{
-                    margin-top: 30px;
-                    padding-top: 20px;
-                    border-top: 1px solid #eee;
-                    text-align: center;
-                    color: #888;
-                    font-size: 12px;
-                    line-height: 1.5;
-                }}
-                .footer strong {{
-                    color: #666;
-                }}
-                @media (max-width: 600px) {{
-                    body {{
-                        padding: 10px;
-                    }}
-                    .container {{
-                        padding: 20px;
-                    }}
-                    .post-meta {{
-                        flex-direction: column;
-                        align-items: flex-start;
-                    }}
-                    .btn {{
-                        padding: 12px 24px;
-                        font-size: 14px;
-                    }}
-                }}
-            </style>
+            <!--[if mso]>
+            <noscript>
+                <xml>
+                    <o:OfficeDocumentSettings>
+                        <o:AllowPNG/>
+                        <o:PixelsPerInch>96</o:PixelsPerInch>
+                    </o:OfficeDocumentSettings>
+                </xml>
+            </noscript>
+            <![endif]-->
         </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🌟 Nuevo Artículo de Bienestar</h1>
-                </div>
-                
-                {image_section}
-                
-                <h2 class="post-title">{post_data['titulo']}</h2>
-                
-                <div class="post-meta">
-                    <span class="author">👤 Por {post_data['autor']}</span>
-                    <span class="category-badge">{category_name}</span>
-                </div>
-                
-                <div class="content">
-                    {content_preview}
-                    <br><br>
-                    <em style="color: #2e3954; font-weight: 500;">Ve el artículo completo haciendo clic en el botón de abajo ⬇️</em>
-                </div>
-                
-                <div class="read-more">
-                    <a href="{post_url}" class="btn">📖 Ver Artículo Completo</a>
-                </div>
-                
-                <div class="footer">
-                    <strong>📧 Correo Automático</strong><br>
-                    Este es un correo automático del sistema de notificaciones de Grupo Kossodo.<br>
-                    <strong>No responder a este mensaje.</strong><br><br>
-                    Si no deseas recibir estas notificaciones, ponte en contacto con el administrador del sistema.
-                </div>
-            </div>
+        <body style="margin:0;padding:0;background-color:#f8f9fa;font-family:Arial,sans-serif;">
+            <!-- Wrapper table para centrar el contenido -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background-color:#f8f9fa;">
+                <tr>
+                    <td align="center" valign="top" style="padding:20px 0;">
+                        <!-- Contenedor principal de 600px -->
+                        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                            <!-- Header -->
+                            <tr>
+                                <td style="padding:30px 40px 20px 40px;text-align:center;border-bottom:3px solid #2e3954;">
+                                    <h1 style="margin:0;color:#2e3954;font-size:28px;font-weight:600;font-family:Arial,sans-serif;">
+                                        🌟 Nuevo Artículo de Bienestar
+                                    </h1>
+                                </td>
+                            </tr>
+                            
+                            <!-- Imagen del post (si existe) -->
+                            {f'''
+                            <tr>
+                                <td style="padding:20px 40px;text-align:center;">
+                                    <img src="{post_data['imagen_url']}" alt="{post_data['titulo']}" style="max-width:100%;height:auto;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:block;margin:0 auto;">
+                                </td>
+                            </tr>
+                            ''' if post_data.get('imagen_url') else ''}
+                            
+                            <!-- Título del post -->
+                            <tr>
+                                <td style="padding:20px 40px 15px 40px;">
+                                    <h2 style="margin:0;color:#2e3954;font-size:24px;font-weight:bold;line-height:1.3;font-family:Arial,sans-serif;">
+                                        {post_data['titulo']}
+                                    </h2>
+                                </td>
+                            </tr>
+                            
+                            <!-- Meta información del post -->
+                            <tr>
+                                <td style="padding:0 40px 20px 40px;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="text-align:left;">
+                                                <span style="color:#666;font-size:14px;font-weight:500;font-family:Arial,sans-serif;">
+                                                    👤 Por {post_data['autor']}
+                                                </span>
+                                            </td>
+                                            <td style="text-align:right;">
+                                                <span style="background-color:#2e3954;color:white;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;font-family:Arial,sans-serif;">
+                                                    {category_name}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            
+                            <!-- Contenido del post -->
+                            <tr>
+                                <td style="padding:0 40px 25px 40px;">
+                                    <div style="color:#555;font-size:16px;line-height:1.7;font-family:Arial,sans-serif;">
+                                        {content_preview}
+                                        <br><br>
+                                        <em style="color:#2e3954;font-weight:500;">Ve el artículo completo haciendo clic en el botón de abajo ⬇️</em>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- Botón para ver artículo completo -->
+                            <tr>
+                                <td style="padding:30px 40px;text-align:center;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                                        <tr>
+                                            <td style="background-color:#2e3954;border-radius:8px;text-align:center;">
+                                                <a href="{post_url}" style="display:inline-block;padding:16px 32px;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:Arial,sans-serif;">
+                                                    📖 Ver Artículo Completo
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="padding:20px 40px 30px 40px;border-top:1px solid #eee;text-align:center;">
+                                    <div style="color:#888;font-size:12px;line-height:1.5;font-family:Arial,sans-serif;">
+                                        <strong style="color:#666;">📧 Correo Automático</strong><br>
+                                        Este es un correo automático del sistema de notificaciones de Grupo Kossodo.<br>
+                                        <strong>No responder a este mensaje.</strong><br><br>
+                                        Si no deseas recibir estas notificaciones, ponte en contacto con el administrador del sistema.
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
         </body>
         </html>
         """

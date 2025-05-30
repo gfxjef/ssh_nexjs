@@ -71,6 +71,7 @@ export interface PostsContextType {
   // Acciones de gestión
   toggleHighlight: (id: number) => Promise<Post>;
   changeStatus: (id: number, status: PostStatus) => Promise<Post>;
+  resendEmail: (id: number) => Promise<boolean>;
 }
 
 // Interfaz para notificaciones

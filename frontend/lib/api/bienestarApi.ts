@@ -248,6 +248,33 @@ export const deletePost = async (id: number): Promise<void> => {
   }
 };
 
+/**
+ * Re-enviar email de notificación para un post publicado
+ * @param id ID del post
+ */
+export const resendPostEmail = async (id: number): Promise<{ success: boolean; message: string; post_title: string }> => {
+  try {
+    const response = await fetch(`${BASE_URL}/posts/${id}/resend-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      // Intenta obtener el mensaje de error del backend si está disponible
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `Error al re-enviar email para el post ${id}`);
+    }
+    
+    const result = await handleResponse<{ success: boolean; message: string; post_title: string }>(response);
+    return result;
+  } catch (error) {
+    console.error('Error en resendPostEmail:', error);
+    throw error;
+  }
+};
+
 // Nueva función para Postularse a un Post
 export async function postularAPost(postId: number, token: string): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
