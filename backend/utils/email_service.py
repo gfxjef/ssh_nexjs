@@ -22,22 +22,111 @@ class EmailService:
     
     def clean_html_content(self, html_content: str, max_chars: int = 500) -> str:
         """
-        Limpia el contenido HTML y lo trunca a max_chars caracteres.
+        Extrae texto hasta la primera imagen + primera imagen + "Ver más".
+        Estrategia simple y efectiva para email marketing.
         """
         if not html_content:
             return ""
         
-        # Remover tags HTML básicos pero mantener saltos de línea
-        clean_text = re.sub(r'<[^>]+>', '', html_content)
+        # Limpiar referencias a elementos multimedia de texto
+        clean_html = re.sub(r'\[imagen\s+numero?\s*\d*[^\]]*\]', '', html_content, flags=re.IGNORECASE)
+        clean_html = re.sub(r'\[video[^\]]*\]', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'\[audio[^\]]*\]', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'\[archivo[^\]]*\]', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'\[documento[^\]]*\]', '', clean_html, flags=re.IGNORECASE)
         
-        # Limpiar espacios extra y saltos de línea múltiples
-        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        # Limpiar etiquetas font y estilos innecesarios
+        clean_html = re.sub(r'<font[^>]*>', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'</font>', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'<div[^>]*>', '<p>', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'</div>', '</p>', clean_html, flags=re.IGNORECASE)
         
-        # Truncar si es necesario
-        if len(clean_text) > max_chars:
-            clean_text = clean_text[:max_chars].rsplit(' ', 1)[0] + "..."
+        # Limpiar etiquetas básicas
+        clean_html = re.sub(r'<p[^>]*>', '<p style="margin:0 0 10px 0;line-height:1.6;">', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'<b[^>]*>', '<strong>', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'</b>', '</strong>', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'<br[^>]*>', '<br>', clean_html, flags=re.IGNORECASE)
         
-        return clean_text
+        # Eliminar otros elementos multimedia problemáticos
+        clean_html = re.sub(r'<video[^>]*>.*?</video>', '', clean_html, flags=re.IGNORECASE | re.DOTALL)
+        clean_html = re.sub(r'<audio[^>]*>.*?</audio>', '', clean_html, flags=re.IGNORECASE | re.DOTALL)
+        clean_html = re.sub(r'<iframe[^>]*>.*?</iframe>', '', clean_html, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Eliminar párrafos vacíos
+        clean_html = re.sub(r'<p[^>]*>\s*</p>', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'<p[^>]*>\s*<br>\s*</p>', '', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'(<br>\s*){3,}', '<br><br>', clean_html, flags=re.IGNORECASE)
+        
+        # ESTRATEGIA SIMPLE: TEXTO HASTA PRIMERA IMAGEN + PRIMERA IMAGEN + "VER MÁS"
+        
+        # Buscar la primera imagen
+        first_img_match = re.search(r'<img[^>]*>', clean_html, flags=re.IGNORECASE)
+        
+        if first_img_match:
+            # Dividir en: [texto antes de imagen] + [primera imagen] + [resto]
+            text_before_img = clean_html[:first_img_match.start()]
+            first_img_tag = first_img_match.group(0)
+            
+            # Extraer src de la primera imagen
+            src_match = re.search(r'src=["\']([^"\']+)["\']', first_img_tag)
+            if src_match:
+                first_img_src = src_match.group(1)
+                
+                # Crear HTML optimizado para email
+                first_img_html = f'<img src="{first_img_src}" style="max-width:100%;height:auto;display:block;margin:15px 0;border-radius:8px;">'
+                
+                # Limpiar texto antes de la imagen
+                text_content = re.sub(r'<[^>]+>', '', text_before_img)
+                text_content = re.sub(r'\s+', ' ', text_content).strip()
+                
+                # Construir resultado final
+                if len(text_content) > max_chars - 50:  # Reservar espacio para "Ver más"
+                    # Truncar texto inteligentemente
+                    truncate_point = max_chars - 50
+                    
+                    # Buscar punto de corte natural
+                    cut_positions = [
+                        text_content.rfind('.', 0, truncate_point),
+                        text_content.rfind(',', 0, truncate_point),
+                        text_content.rfind(' ', 0, truncate_point - 20)
+                    ]
+                    
+                    best_cut = max([pos for pos in cut_positions if pos > truncate_point * 0.7])
+                    if best_cut > 0:
+                        truncate_point = best_cut
+                    
+                    text_content = text_content[:truncate_point].strip()
+                
+                # Generar HTML final: [Texto] + [Imagen] (sin mensaje redundante)
+                final_html = f'''
+                <p style="margin:0 0 15px 0;line-height:1.6;color:#555;font-size:16px;">
+                    {text_content}
+                </p>
+                {first_img_html}
+                '''
+                
+                return final_html.strip()
+        
+        # Si no hay imágenes, solo devolver texto truncado
+        text_content = re.sub(r'<[^>]+>', '', clean_html)
+        text_content = re.sub(r'\s+', ' ', text_content).strip()
+        
+        if len(text_content) > max_chars:
+            truncate_point = max_chars - 3
+            
+            cut_positions = [
+                text_content.rfind('.', 0, truncate_point),
+                text_content.rfind(',', 0, truncate_point),
+                text_content.rfind(' ', 0, truncate_point - 20)
+            ]
+            
+            best_cut = max([pos for pos in cut_positions if pos > truncate_point * 0.7])
+            if best_cut > 0:
+                truncate_point = best_cut
+            
+            text_content = text_content[:truncate_point].strip() + "..."
+        
+        return f'<p style="margin:0 0 15px 0;line-height:1.6;color:#555;font-size:16px;">{text_content}</p>'
     
     def create_post_notification_email(self, post_data: dict, category_name: str) -> str:
         """
@@ -181,7 +270,7 @@ class EmailService:
         Returns:
             bool: True si se envió correctamente, False en caso contrario
         """
-        # Destinatarios por defecto
+        # Destinatarios por defecto (PRODUCCIÓN)
         if recipient_emails is None:
             recipient_emails = ["personal@kossodo.com", "personal@kossomet.com"]
         
