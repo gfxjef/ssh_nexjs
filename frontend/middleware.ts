@@ -8,35 +8,35 @@ export function middleware(request: NextRequest) {
   const protectedRoutes = ['/dashboard'];
   
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ['/login', '/', '/test-redirect'];
+  const publicRoutes = ['/login', '/', '/test-login'];
   
   // Verificar si la ruta actual está protegida
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route));
   
-  console.log(`🛣️ [MIDDLEWARE] Procesando ruta: ${pathname}, Protegida: ${isProtectedRoute}, Pública: ${isPublicRoute}`);
+  // Obtener token de cookies
+  const token = request.cookies.get('auth-token')?.value;
+  const allCookies = request.cookies.getAll();
+  
+  console.log(`🛣️ [MIDDLEWARE] Procesando ruta: ${pathname}`);
+  console.log(`🔐 [MIDDLEWARE] Token presente: ${!!token}, Protegida: ${isProtectedRoute}, Pública: ${isPublicRoute}`);
+  console.log(`🍪 [MIDDLEWARE] Cookies disponibles:`, allCookies.map(c => c.name));
   
   if (isProtectedRoute) {
-    // Verificar token en cookies (más seguro que localStorage en middleware)
-    const token = request.cookies.get('auth-token')?.value;
-    
-    console.log(`🔐 [MIDDLEWARE] Token presente: ${!!token}`);
-    
     if (!token) {
       // Guardar la URL actual para redirección después del login
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('returnUrl', pathname + request.nextUrl.search);
       
-      console.log(`🔒 [MIDDLEWARE] Redirigiendo a login desde: ${pathname} → ${loginUrl.toString()}`);
+      console.log(`🔒 [MIDDLEWARE] Sin token - Redirigiendo a login desde: ${pathname} → ${loginUrl.toString()}`);
       return NextResponse.redirect(loginUrl);
     }
     
-    console.log(`✅ [MIDDLEWARE] Acceso autorizado a: ${pathname}`);
+    console.log(`✅ [MIDDLEWARE] Acceso autorizado a: ${pathname} (token: ${token.substring(0, 20)}...)`);
   }
   
   // Si está en login y ya tiene token, redirigir al dashboard o returnUrl
   if (pathname === '/login') {
-    const token = request.cookies.get('auth-token')?.value;
     if (token) {
       const returnUrl = request.nextUrl.searchParams.get('returnUrl');
       let redirectUrl = '/dashboard';
@@ -54,11 +54,14 @@ export function middleware(request: NextRequest) {
         }
       }
       
-      console.log(`✅ [MIDDLEWARE] Ya autenticado, redirigiendo de login a: ${redirectUrl}`);
+      console.log(`✅ [MIDDLEWARE] Ya autenticado en /login, redirigiendo a: ${redirectUrl}`);
       return NextResponse.redirect(new URL(redirectUrl, request.url));
+    } else {
+      console.log(`ℹ️ [MIDDLEWARE] En /login sin token - permitiendo acceso`);
     }
   }
   
+  console.log(`➡️ [MIDDLEWARE] Continuando normalmente a: ${pathname}`);
   return NextResponse.next();
 }
 

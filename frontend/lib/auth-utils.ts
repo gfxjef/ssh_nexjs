@@ -7,9 +7,24 @@ export const setAuthCookie = (token: string, days: number = 7) => {
   const expires = new Date();
   expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
   
-  document.cookie = `auth-token=${token}; expires=${expires.toUTCString()}; path=/; SameSite=Strict; Secure=${window.location.protocol === 'https:'}`;
+  // En desarrollo (HTTP), no usar Secure flag
+  const isHttps = window.location.protocol === 'https:';
+  const cookieString = `auth-token=${token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax${isHttps ? '; Secure' : ''}`;
   
-  console.log('🍪 [AUTH] Cookie establecida:', { token: token.substring(0, 20) + '...', expires });
+  document.cookie = cookieString;
+  
+  console.log('🍪 [AUTH] Cookie establecida:', { 
+    token: token.substring(0, 20) + '...', 
+    expires, 
+    cookieString: cookieString.replace(token, 'TOKEN_HIDDEN'),
+    isHttps 
+  });
+  
+  // Verificar que la cookie se estableció correctamente
+  setTimeout(() => {
+    const verification = document.cookie.includes('auth-token=');
+    console.log('🔍 [AUTH] Verificación de cookie después de establecer:', verification);
+  }, 50);
 };
 
 // Función para eliminar cookie de autenticación
@@ -37,12 +52,16 @@ export const getAuthCookie = (): string | null => {
 
 // Función para obtener URL de retorno desde query params
 export const getReturnUrl = (searchParams?: URLSearchParams): string => {
+  if (searchParams) {
+    return searchParams.get('returnUrl') || '/dashboard';
+  }
+  
   if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('returnUrl') || '/dashboard';
   }
   
-  return searchParams?.get('returnUrl') || '/dashboard';
+  return '/dashboard';
 };
 
 // Función para limpiar URL de retorno de query params

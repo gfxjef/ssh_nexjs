@@ -1,7 +1,7 @@
 // Login page component
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import GradientCanvas from '../components/GradientCanvas'; // Importar el componente del canvas
@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUser, faLock, faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { setAuthentication, getReturnUrl, cleanReturnUrl } from '@/lib/auth-utils';
 
-export default function Login() {
+function LoginContent() {
   const [credentials, setCredentials] = useState({
     usuario: '',
     pass: ''
@@ -60,13 +60,41 @@ export default function Login() {
         setAuthentication(data.token, data.usuario);
         
         // Obtener la URL de retorno desde query params
-        const returnUrl = getReturnUrl(searchParams || undefined);
-        const cleanUrl = cleanReturnUrl(returnUrl);
+        const returnUrl = searchParams?.get('returnUrl');
+        console.log('🔄 [LOGIN] returnUrl desde searchParams:', returnUrl);
         
-        console.log('🔄 [LOGIN] Redirigiendo a:', cleanUrl);
+        let redirectUrl = '/dashboard'; // Default fallback
         
-        // Redirigir a la URL original o al dashboard
-        router.push(cleanUrl);
+        if (returnUrl) {
+          // Validar que la returnUrl sea una ruta interna válida
+          try {
+            // Si returnUrl empieza con /, es una ruta relativa válida
+            if (returnUrl.startsWith('/') && !returnUrl.startsWith('//')) {
+              redirectUrl = returnUrl;
+              console.log('✅ [LOGIN] returnUrl válida, usando:', redirectUrl);
+            } else {
+              console.warn('⚠️ [LOGIN] returnUrl inválida (no es ruta interna):', returnUrl);
+            }
+          } catch (error) {
+            console.warn('⚠️ [LOGIN] Error al validar returnUrl:', error);
+          }
+        } else {
+          console.log('ℹ️ [LOGIN] No hay returnUrl, usando dashboard por defecto');
+        }
+        
+        console.log('🚀 [LOGIN] Redirigiendo a:', redirectUrl);
+        
+        // Verificar que la cookie se haya establecido antes de redirigir
+        const cookieVerification = document.cookie.includes('auth-token=');
+        console.log('🍪 [LOGIN] Cookie verificada:', cookieVerification);
+        
+        // Usar window.location.href para forzar una navegación completa
+        // Esto asegura que el middleware procese la nueva request con la cookie
+        setTimeout(() => {
+          console.log('🔀 [LOGIN] Ejecutando redirección con window.location.href');
+          window.location.href = redirectUrl;
+        }, 200); // Pequeño delay para asegurar que la cookie se establezca
+        
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Error al iniciar sesión');
@@ -116,8 +144,8 @@ export default function Login() {
               {error && <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded-md">{error}</div>}
               {successMessage && <div className="mb-4 p-3 text-sm text-green-700 bg-green-100 rounded-md">{successMessage}</div>}
               
-              {/* Mostrar información de redirección si existe returnUrl */}
-              {searchParams?.get('returnUrl') && (
+              {/* Mostrar información de redirección solo si existe returnUrl válida */}
+              {searchParams?.get('returnUrl') && searchParams.get('returnUrl')?.trim() && (
                 <div className="mb-4 p-3 text-sm text-blue-700 bg-blue-100 rounded-md">
                   Después del login serás redirigido a la página que intentabas visitar.
                 </div>
@@ -205,5 +233,29 @@ export default function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LoginLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen overflow-hidden bg-gray-100">
+      <GradientCanvas />
+      <div className="login-wrapper flex w-[840px] max-w-[95%] min-h-[535px] bg-transparent rounded-xl shadow-2xl overflow-hidden z-10 my-8">
+        <div className="form-panel flex-1 p-8 sm:p-12 flex flex-col justify-center bg-white/70 backdrop-blur-md rounded-xl">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CBA9D] mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando página de login...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<LoginLoadingFallback />}>
+      <LoginContent />
+    </Suspense>
   );
 }
