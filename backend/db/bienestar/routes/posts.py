@@ -10,12 +10,25 @@ from ..queries import (
     GET_POSTS_HIGHLIGHTED, GET_POST_BY_ID, SEARCH_POSTS,
     INSERT_POST, UPDATE_POST, UPDATE_POST_STATUS, UPDATE_POST_HIGHLIGHT,
     INCREMENT_VIEWS, DELETE_POST, CHECK_EXISTING_POSTULACION, INSERT_POSTULACION,
-    GET_POSTULANTES_BY_POST_ID
+    GET_POSTULANTES_BY_POST_ID, UPDATE_POST_EMAIL_SENT
 )
 from ...mysql_connection import MySQLConnection # Importar la clase
 from ...bienestar import bienestar_bp
 # Importar funciones de login para verificación de token y obtención de datos de usuario
 from ...login import verificar_token, obtener_usuario_por_id # Asumiendo que están en el __init__ de login
+
+# Importar servicio de email
+try:
+    import sys
+    import os
+    # Agregar el directorio padre para acceder a utils
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    from utils.email_service import email_service
+    EMAIL_SERVICE_AVAILABLE = True
+    print("✅ [EMAIL] Servicio de correos cargado correctamente")
+except ImportError as e:
+    EMAIL_SERVICE_AVAILABLE = False
+    print(f"⚠️ [EMAIL] Servicio de correos no disponible: {e}")
 
 @bienestar_bp.route('/posts', methods=['GET'])
 def get_posts():
@@ -403,6 +416,11 @@ def change_post_status(post_id):
                 'error': 'Post no encontrado'
             }), 404
         
+        # Obtener el estado anterior y verificar si ya se envió email
+        post_anterior = existing[0]
+        estado_anterior = post_anterior['estado']
+        email_enviado_previamente = post_anterior.get('email_sent', False)
+        
         # Actualizar estado
         result = db_ops.execute_query(
             UPDATE_POST_STATUS,
@@ -416,14 +434,61 @@ def change_post_status(post_id):
                 'error': 'No se pudo actualizar el estado del post'
             }), 500
         
+        # 🚀 LÓGICA DE ENVÍO DE CORREO
+        email_enviado = False
+        if (nuevo_estado == PostStatus.PUBLISHED.value and 
+            estado_anterior != PostStatus.PUBLISHED.value and 
+            not email_enviado_previamente and 
+            EMAIL_SERVICE_AVAILABLE):
+            
+            try:
+                print(f"📧 [EMAIL] Enviando notificación para post publicado: {post_id}")
+                
+                # Obtener información completa del post y categoría
+                post_data = db_ops.execute_query(GET_POST_BY_ID, (post_id,))[0]
+                
+                # Obtener nombre de la categoría
+                categoria_query = "SELECT nombre FROM categorias_bienestar WHERE id = %s"
+                categoria_result = db_ops.execute_query(categoria_query, (post_data['categoria_id'],))
+                category_name = categoria_result[0]['nombre'] if categoria_result else "Sin categoría"
+                
+                # Enviar email de notificación
+                email_success = email_service.send_post_notification(
+                    post_data=post_data,
+                    category_name=category_name
+                )
+                
+                if email_success:
+                    # Marcar como email enviado en la base de datos
+                    db_ops.execute_query(
+                        UPDATE_POST_EMAIL_SENT,
+                        (True, post_id),
+                        fetch=False
+                    )
+                    email_enviado = True
+                    print(f"✅ [EMAIL] Notificación enviada y marcada en BD para post {post_id}")
+                else:
+                    print(f"❌ [EMAIL] Error al enviar notificación para post {post_id}")
+                    
+            except Exception as email_error:
+                print(f"❌ [EMAIL] Error en envío de notificación para post {post_id}: {str(email_error)}")
+                # No fallar la actualización del estado por un error de email
+        
         # Obtener el post actualizado
         updated_post = db_ops.execute_query(GET_POST_BY_ID, (post_id,))
         
-        return jsonify({
+        response_data = {
             'success': True,
             'message': 'Estado del post actualizado correctamente',
             'data': post_schema(updated_post[0])
-        })
+        }
+        
+        # Agregar información del email si se envió
+        if email_enviado:
+            response_data['email_sent'] = True
+            response_data['message'] += ' y notificación enviada por correo'
+        
+        return jsonify(response_data)
         
     except Exception as e:
         error_details = traceback.format_exc()

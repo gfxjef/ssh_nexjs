@@ -37,12 +37,60 @@ def setup_database():
             print("Error al crear la tabla de postulaciones")
             return False
         
+        # Ejecutar migraciones necesarias
+        migrate_database(db_ops_setup)
+        
         print("Tablas de bienestar (categorías, posts, postulaciones) creadas/verificadas correctamente")
         return True
         
     except Exception as e:
         print(f"Error al configurar la base de datos: {e}")
         return False
+
+def migrate_database(db_ops):
+    """
+    Ejecuta migraciones necesarias para actualizar el esquema de la base de datos.
+    
+    Args:
+        db_ops: Instancia de MySQLConnection
+    """
+    try:
+        # Migración 1: Agregar campo email_sent a tabla posts_bienestar
+        print("🔄 [MIGRATION] Verificando campo email_sent en posts_bienestar...")
+        
+        # Verificar si el campo ya existe
+        check_column = """
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'posts_bienestar' 
+        AND COLUMN_NAME = 'email_sent'
+        """
+        
+        column_exists = db_ops.execute_query(check_column)
+        
+        if not column_exists or len(column_exists) == 0:
+            # El campo no existe, agregarlo
+            add_column = """
+            ALTER TABLE posts_bienestar 
+            ADD COLUMN email_sent BOOLEAN DEFAULT FALSE 
+            AFTER imagen_url
+            """
+            
+            result = db_ops.execute_query(add_column, fetch=False)
+            if result is not None:
+                print("✅ [MIGRATION] Campo email_sent agregado exitosamente a posts_bienestar")
+            else:
+                print("❌ [MIGRATION] Error al agregar campo email_sent")
+        else:
+            print("ℹ️ [MIGRATION] Campo email_sent ya existe en posts_bienestar")
+            
+        # Aquí se pueden agregar más migraciones en el futuro
+        
+    except Exception as e:
+        print(f"❌ [MIGRATION] Error durante migración: {e}")
+        # No fallar el setup por errores de migración
+        pass
 
 def seed_initial_data():
     """

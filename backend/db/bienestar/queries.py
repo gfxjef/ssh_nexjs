@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS posts_bienestar (
   vistas INT DEFAULT 0,
   categoria_id INT NOT NULL,
   imagen_url VARCHAR(255),
+  email_sent BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (categoria_id) REFERENCES categorias_bienestar(id)
@@ -120,6 +121,12 @@ WHERE id = %s
 UPDATE_POST_HIGHLIGHT = """
 UPDATE posts_bienestar SET
   destacado = %s
+WHERE id = %s
+"""
+
+UPDATE_POST_EMAIL_SENT = """
+UPDATE posts_bienestar SET
+  email_sent = %s
 WHERE id = %s
 """
 
