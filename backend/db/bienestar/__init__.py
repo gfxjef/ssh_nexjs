@@ -10,10 +10,14 @@ bienestar_bp = Blueprint('bienestar', __name__)
 
 # Importar las rutas
 from .routes import posts, categories 
+from .routes.usuarios import usuarios_bp
 
 # Importar y registrar el blueprint de documentos
 from .documentos import documentos_bp
 bienestar_bp.register_blueprint(documentos_bp, url_prefix='/documentos')
+
+# Registrar el blueprint de usuarios
+bienestar_bp.register_blueprint(usuarios_bp, url_prefix='')
 
 # Importar funciones de setup
 from .setup import setup_database, seed_initial_data

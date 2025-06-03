@@ -7,3 +7,4 @@ alwaysApply: true
 - Si se crean archivos para hacer pruebas se deben de eliminar los archivos de pruebas.
 
 - No Olvidés que PowerShell no acepta el operador &&. asi que debe ejecutar los comandos de forma separada.
+- el serivdoR BACKEND SIEMTE ESTA ACTIVO, solo que demore 60 segundos en reiniciar asi que coloca un timeout mas largo para las pruebnas.

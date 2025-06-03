@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+* Si vamos a hacer uso de la base de datos utilizaremos como configuracion inicial /backend/db/config.py para el acceso al Base de datos

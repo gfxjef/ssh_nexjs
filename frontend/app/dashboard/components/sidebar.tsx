@@ -69,7 +69,8 @@ export const navItemsConfig = [
       { name: 'Documentos', href: '/dashboard/bienestar/documentos', icon: <DescriptionIcon /> },
       { name: 'Administración', href: '/dashboard/bienestar/administracion', icon: <AdminPanelSettingsIcon />, isGrouper: true, children: [
         { name: 'Administrar Publicaciones', href: '/dashboard/bienestar/admin-posts', icon: <EditNoteIcon /> },
-        { name: 'Administrar Documentos', href: '/dashboard/bienestar/documentos/admin', icon: <AdminPanelSettingsIcon /> }
+        { name: 'Administrar Documentos', href: '/dashboard/bienestar/documentos/admin', icon: <AdminPanelSettingsIcon /> },
+        { name: 'Administrar Personal', href: '/dashboard/bienestar/admin-personal', icon: <AdminPanelSettingsIcon /> }
       ]}
     ],
   }

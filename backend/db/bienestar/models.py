@@ -144,4 +144,80 @@ def postulante_schema(postulante_data):
         'nombre': postulante_data.get('nombre', 'No disponible'),
         'correo': postulante_data.get('correo', 'No disponible'),
         'fechaPostulacion': postulante_data['fecha_postulacion'].isoformat() if isinstance(postulante_data.get('fecha_postulacion'), datetime) else postulante_data.get('fecha_postulacion')
-    } 
+    }
+
+def user_schema(user_data):
+    """
+    Convierte un registro de la base de datos de un usuario a un diccionario formateado para la API.
+    
+    Args:
+        user_data (dict): Registro de base de datos del usuario
+        
+    Returns:
+        dict: Usuario formateado para API
+    """
+    if not user_data:
+        return None
+        
+    return {
+        'id': user_data['id'],
+        'correo': user_data['correo'],
+        'nombre': user_data['nombre'],
+        'usuario': user_data['usuario'],
+        'cargo': user_data['cargo'],
+        'grupo': user_data['grupo'],
+        'rango': user_data['rango']
+    }
+
+def validate_user_update(user_data):
+    """
+    Valida los datos de actualización de un usuario.
+    Solo valida los campos editables: correo, nombre, cargo, grupo.
+    
+    Args:
+        user_data (dict): Datos del usuario a validar
+        
+    Returns:
+        tuple: (boolean, string) - (es_válido, mensaje_error)
+    """
+    errors = []
+    
+    # Validar correo (requerido y formato básico)
+    if 'correo' not in user_data or not user_data['correo']:
+        errors.append("El campo 'correo' es obligatorio")
+    elif '@' not in user_data['correo'] or '.' not in user_data['correo']:
+        errors.append("El correo electrónico no tiene un formato válido")
+    
+    # Validar nombre (requerido)
+    if 'nombre' not in user_data or not user_data['nombre'].strip():
+        errors.append("El campo 'nombre' es obligatorio")
+    elif len(user_data['nombre'].strip()) < 2:
+        errors.append("El nombre debe tener al menos 2 caracteres")
+    
+    # Validar cargo (opcional pero si se proporciona debe tener contenido)
+    if 'cargo' in user_data and user_data['cargo'] is not None:
+        if len(user_data['cargo'].strip()) < 2:
+            errors.append("El cargo debe tener al menos 2 caracteres si se especifica")
+    
+    # Validar grupo (opcional pero si se proporciona debe tener contenido)
+    if 'grupo' in user_data and user_data['grupo'] is not None:
+        if len(user_data['grupo'].strip()) < 2:
+            errors.append("El grupo debe tener al menos 2 caracteres si se especifica")
+    
+    # Validar longitudes máximas
+    if 'correo' in user_data and len(user_data['correo']) > 255:
+        errors.append("El correo no puede exceder 255 caracteres")
+    
+    if 'nombre' in user_data and len(user_data['nombre']) > 100:
+        errors.append("El nombre no puede exceder 100 caracteres")
+    
+    if 'cargo' in user_data and user_data['cargo'] and len(user_data['cargo']) > 100:
+        errors.append("El cargo no puede exceder 100 caracteres")
+    
+    if 'grupo' in user_data and user_data['grupo'] and len(user_data['grupo']) > 255:
+        errors.append("El grupo no puede exceder 255 caracteres")
+    
+    if errors:
+        return (False, ", ".join(errors))
+    
+    return (True, "") 

@@ -166,4 +166,44 @@ FROM postulaciones_bienestar p
 JOIN usuarios u ON p.usuario_id = u.id
 WHERE p.post_id = %s
 ORDER BY p.fecha_postulacion DESC
+"""
+
+# ==========================================
+# CONSULTAS PARA ADMINISTRACIÓN DE USUARIOS
+# ==========================================
+
+# Obtener todos los usuarios
+GET_ALL_USERS = """
+SELECT id, correo, nombre, usuario, cargo, grupo, rango 
+FROM usuarios 
+ORDER BY nombre ASC
+"""
+
+# Obtener usuario específico por ID
+GET_USER_BY_ID = """
+SELECT id, correo, nombre, usuario, cargo, grupo, rango 
+FROM usuarios 
+WHERE id = %s
+"""
+
+# Actualizar campos editables de usuario
+UPDATE_USER = """
+UPDATE usuarios 
+SET correo = %s, nombre = %s, cargo = %s, grupo = %s
+WHERE id = %s
+"""
+
+# Verificar si existe usuario por ID (para validaciones)
+CHECK_USER_EXISTS = """
+SELECT COUNT(*) as count 
+FROM usuarios 
+WHERE id = %s
+"""
+
+# Buscar usuarios por texto (nombre, correo, cargo)
+SEARCH_USERS = """
+SELECT id, correo, nombre, usuario, cargo, grupo, rango 
+FROM usuarios 
+WHERE (nombre LIKE %s OR correo LIKE %s OR cargo LIKE %s)
+ORDER BY nombre ASC
 """ 
