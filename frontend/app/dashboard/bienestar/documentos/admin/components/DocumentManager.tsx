@@ -92,6 +92,12 @@ export default function DocumentManager({
 
      // Filtrar documentos
    const filteredDocuments = documents.filter(doc => {
+     // 🛡️ SEGURIDAD: Verificar que el documento existe y tiene propiedades requeridas
+     if (!doc || !doc.titulo) {
+       console.warn('⚠️ Documento inválido encontrado:', doc);
+       return false;
+     }
+     
      const matchesSearch = doc.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (doc.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (doc.autor || '').toLowerCase().includes(searchTerm.toLowerCase());

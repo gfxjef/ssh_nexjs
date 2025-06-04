@@ -144,6 +144,11 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
     });
 
     setUploadFiles(prev => [...prev, ...newFiles]);
+    
+    // 🎯 UX MEJORADO: Abrir automáticamente metadatos cuando se seleccione archivo
+    if (newFiles.length > 0) {
+      setShowMetadataForm(true);
+    }
   }, []);
 
   // Manejar drag & drop
@@ -444,7 +449,7 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
                 id="titulo"
                 value={formData.titulo}
                 onChange={(e) => handleFormChange('titulo', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                 placeholder="Dejar vacío para usar el nombre del archivo"
               />
             </div>
@@ -459,7 +464,7 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
                 rows={3}
                 value={formData.descripcion}
                 onChange={(e) => handleFormChange('descripcion', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                 placeholder="Descripción opcional del documento"
               />
             </div>
@@ -473,7 +478,7 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
                 id="categoria"
                 value={formData.categoria_id}
                 onChange={(e) => handleFormChange('categoria_id', parseInt(e.target.value))}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900 ${
                   formData.categoria_id === 0 ? 'border-red-300 bg-red-50' : 'border-gray-300'
                 }`}
                 required
@@ -500,7 +505,7 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
                 id="autor"
                 value={formData.autor}
                 onChange={(e) => handleFormChange('autor', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
               />
             </div>
 

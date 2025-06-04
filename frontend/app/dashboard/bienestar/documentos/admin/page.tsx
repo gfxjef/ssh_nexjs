@@ -59,6 +59,13 @@ export default function DocumentAdminPage() {
 
   // Handlers para comunicación entre componentes
   const handleDocumentUploaded = (newDocument: Document) => {
+    // 🛡️ SEGURIDAD: Verificar que el documento es válido antes de agregarlo
+    if (!newDocument || !newDocument.titulo) {
+      console.error('⚠️ Documento inválido recibido en handleDocumentUploaded:', newDocument);
+      return;
+    }
+    
+    console.log('✅ Agregando documento válido:', newDocument.titulo);
     setDocuments(prev => [newDocument, ...prev]);
   };
 

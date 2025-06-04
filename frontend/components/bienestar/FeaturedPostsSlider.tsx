@@ -42,6 +42,41 @@ export default function FeaturedPostsSlider({
     const categoria = categories.find(cat => cat.id === categoriaId);
     return categoria ? categoria.color : '#2e3954';
   };
+
+  // 📝 FUNCIONES DE TRUNCAMIENTO INTELIGENTE Y RESPONSIVO
+  const truncateTitle = (title: string): string => {
+    // Diferentes límites según el tamaño de pantalla (simulado)
+    const maxLength = typeof window !== 'undefined' && window.innerWidth < 768 ? 45 : 65;
+    
+    if (title.length <= maxLength) return title;
+    
+    // Buscar un espacio cerca del límite para cortar de manera inteligente
+    const truncated = title.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    // Si encontramos un espacio en los últimos 15 caracteres, cortar ahí
+    if (lastSpace > maxLength - 15) {
+      return truncated.substring(0, lastSpace) + '...';
+    }
+    
+    return truncated + '...';
+  };
+
+  const truncateExtract = (extract: string): string => {
+    // Diferentes límites según el tamaño de pantalla (simulado)  
+    const maxLength = typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 120;
+    
+    if (extract.length <= maxLength) return extract;
+    
+    const truncated = extract.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    if (lastSpace > maxLength - 20) {
+      return truncated.substring(0, lastSpace) + '...';
+    }
+    
+    return truncated + '...';
+  };
   
   const handleReadMore = (postId: number) => {
     router.push(`/dashboard/bienestar/posts/${postId}`);
@@ -100,22 +135,22 @@ export default function FeaturedPostsSlider({
               <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full translate-y-1/4 -translate-x-1/4 z-20"></div>
               
               {/* Contenido del slide - Alineado a la izquierda */}
-              <div className="absolute inset-0 flex flex-col justify-between z-30 p-8">
+              <div className="absolute inset-0 flex flex-col justify-between z-30 p-6 md:p-8">
                 {/* Contenido superior - Título */}
-                <div className="text-left max-w-lg">
-                  <h2 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg leading-tight">
-                    {post.titulo}
+                <div className="text-left max-w-xl">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 md:mb-4 text-white drop-shadow-lg leading-tight">
+                    {truncateTitle(post.titulo)}
                   </h2>
-                  <p className="text-white text-opacity-90 mb-4 line-clamp-3 text-lg">
-                    {post.extracto}
+                  <p className="text-white text-opacity-90 mb-4 text-sm sm:text-base lg:text-lg leading-relaxed">
+                    {truncateExtract(post.extracto)}
                   </p>
                 </div>
                 
                 {/* Contenido inferior - Categoría y botón */}
-                <div className="text-left max-w-lg">
-                  <div className="mb-4">
+                <div className="text-left max-w-xl">
+                  <div className="mb-3 md:mb-4">
                     <span 
-                      className="inline-block px-4 py-2 rounded-full text-white text-sm font-medium"
+                      className="inline-block px-3 py-1.5 md:px-4 md:py-2 rounded-full text-white text-xs md:text-sm font-medium"
                       style={{ backgroundColor: obtenerColorCategoria(post.categoriaId) }}
                     >
                       {post.categoria}
@@ -123,7 +158,7 @@ export default function FeaturedPostsSlider({
                   </div>
                   <button 
                     onClick={() => handleReadMore(post.id)}
-                    className="px-6 py-3 rounded-lg bg-white text-[#2e3954] font-bold transition-all duration-300 hover:bg-opacity-90 hover:shadow-lg shadow-md transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                    className="px-4 py-2 md:px-6 md:py-3 rounded-lg bg-white text-[#2e3954] font-bold text-sm md:text-base transition-all duration-300 hover:bg-opacity-90 hover:shadow-lg shadow-md transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
                   >
                     Leer Más
                   </button>
