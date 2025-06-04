@@ -32,14 +32,27 @@ class S3UploadManager:
             "allowed_mimes": {"application/pdf"}
         },
         UploadType.DOCUMENTOS: {
-            "max_size": 20 * 1024 * 1024,  # 20MB (Documentos)
-            "allowed_extensions": {".pdf", ".doc", ".docx", ".xls", ".xlsx"},
+            "max_size": 20 * 1024 * 1024,  # 20MB (Documentos e Imágenes)
+            "allowed_extensions": {
+                # Documentos
+                ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".rtf",
+                # Imágenes  
+                ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".tiff", ".tif", ".ico"
+            },
             "allowed_mimes": {
+                # Documentos
                 "application/pdf", 
                 "application/msword",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 "application/vnd.ms-excel",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "text/plain",
+                "application/rtf",
+                # Imágenes
+                "image/jpeg", "image/jpg", "image/png", "image/gif", "image/bmp", 
+                "image/webp", "image/svg+xml", "image/tiff", "image/tif", "image/x-icon", "image/ico"
             }
         },
         UploadType.PROFILES: {

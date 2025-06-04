@@ -5,8 +5,13 @@
 
 import { Document, DocumentCategory, DocumentTag, DocumentFilters, DocumentGroup } from '../types';
 
-// Configuración base de la API
-const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'}/api/bienestar/documentos`;
+// Configuración base de la API - USAR SOLO LA VARIABLE DE ENTORNO
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/bienestar/documentos`;
+
+// Verificar que la variable de entorno esté definida
+if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+  throw new Error('❌ ERROR: NEXT_PUBLIC_API_BASE_URL no está definida en .env.local');
+}
 
 // Función para obtener el token de autorización
 const getAuthToken = (): string | null => {

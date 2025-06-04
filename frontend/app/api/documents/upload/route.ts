@@ -32,7 +32,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar extensiones permitidas
-    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'zip', 'rar', '7z', 'mp4', 'avi', 'mov', 'wmv'];
+    const allowedExtensions = [
+      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 
+      // Formatos de imagen ampliados
+      'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif', 'ico',
+      // Otros formatos
+      'zip', 'rar', '7z', 'mp4', 'avi', 'mov', 'wmv'
+    ];
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
     
     if (!allowedExtensions.includes(extension)) {
@@ -59,7 +65,13 @@ export async function POST(request: NextRequest) {
     // === ENVIAR ARCHIVO Y METADATOS AL BACKEND S3 ===
     try {
       const authHeader = request.headers.get('Authorization') || '';
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      
+      // Verificar que la variable de entorno esté definida
+      if (!backendUrl) {
+        console.error('❌ ERROR: NEXT_PUBLIC_API_BASE_URL no está definida en .env.local');
+        return NextResponse.json({ error: 'Error de configuración del servidor' }, { status: 500 });
+      }
       
       // Crear FormData para enviar al backend S3 (archivo + metadatos en una sola llamada)
       const s3FormData = new FormData();
@@ -77,6 +89,8 @@ export async function POST(request: NextRequest) {
       // Subir archivo a S3 a través del backend
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos para archivos grandes
+      
+      console.log(`🔗 [DEBUG] Backend URL: ${backendUrl}/api/bienestar/documentos/api/documents/create-with-file`);
       
       const backendResponse = await fetch(`${backendUrl}/api/bienestar/documentos/api/documents/create-with-file`, {
         method: 'POST',

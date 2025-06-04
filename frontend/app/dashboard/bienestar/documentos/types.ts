@@ -40,6 +40,9 @@ export interface Document {
   tipo_mime: string;
   categoria_id: number;
   categoria?: DocumentCategory;
+  categoria_nombre?: string; // Nombre de la categoría directamente del backend
+  categoria_color?: string; // Color de la categoría del backend
+  categoria_icono?: string; // Icono de la categoría del backend
   subido_por: number;
   autor?: string;
   descargas: number;

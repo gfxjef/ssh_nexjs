@@ -49,7 +49,7 @@ export default function FeaturedPostsSlider({
   
   if (loading) {
     return (
-      <div className="mb-12 rounded-xl overflow-hidden shadow-2xl h-96 flex items-center justify-center bg-gradient-to-r from-[#2e3954] to-[#3a4665]">
+      <div className="rounded-xl overflow-hidden shadow-2xl h-96 flex items-center justify-center bg-gradient-to-r from-[#2e3954] to-[#3a4665]">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
       </div>
     );
@@ -57,7 +57,7 @@ export default function FeaturedPostsSlider({
   
   if (featuredPosts.length === 0) {
     return (
-      <div className="mb-12 rounded-xl overflow-hidden shadow-2xl h-96 flex items-center justify-center bg-gradient-to-r from-[#2e3954] to-[#3a4665]">
+      <div className="rounded-xl overflow-hidden shadow-2xl h-96 flex items-center justify-center bg-gradient-to-r from-[#2e3954] to-[#3a4665]">
         <div className="text-center max-w-2xl px-6 z-10">
           <h2 className="text-3xl font-bold mb-4 text-white">No hay posts destacados</h2>
           <p className="text-white text-opacity-80 mb-6">
@@ -69,7 +69,7 @@ export default function FeaturedPostsSlider({
   }
   
   return (
-    <div className="mb-12 rounded-xl overflow-hidden shadow-2xl transform transition-all duration-300 hover:shadow-[#8dbba3] hover:scale-[1.01]">
+    <div className="rounded-xl overflow-hidden shadow-2xl transform transition-all duration-300 hover:shadow-[#8dbba3] hover:scale-[1.01]">
       <Swiper
         modules={[Pagination, Navigation, Autoplay, EffectFade]}
         pagination={{ clickable: true }}

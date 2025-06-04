@@ -59,12 +59,23 @@ export default function FileUploader({ categories, tags, onDocumentUploaded }: F
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    // Formatos de imagen ampliados
     'image/jpeg',
+    'image/jpg',
     'image/png',
     'image/gif',
+    'image/bmp',
+    'image/webp',
+    'image/svg+xml',
+    'image/tiff',
+    'image/tif',
+    'image/ico',
+    'image/x-icon',
+    // Otros tipos
     'text/plain',
     'application/zip',
-    'application/x-rar-compressed'
+    'application/x-rar-compressed',
+    'application/x-7z-compressed'
   ];
 
   // Tamaño máximo: 10MB

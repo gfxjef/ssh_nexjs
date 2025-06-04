@@ -227,7 +227,7 @@ export default function CategoryManager({
           placeholder="Buscar categorías..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+          className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
         />
         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
           <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -339,7 +339,7 @@ export default function CategoryManager({
                       maxLength={50}
                       value={formData.nombre}
                       onChange={(e) => handleFormChange('nombre', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                       placeholder="Ej: Marketing, RRHH, Finanzas..."
                     />
                   </div>
@@ -355,7 +355,7 @@ export default function CategoryManager({
                       maxLength={200}
                       value={formData.descripcion}
                       onChange={(e) => handleFormChange('descripcion', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                       placeholder="Descripción opcional de la categoría"
                     />
                     <p className="text-xs text-gray-500 mt-1">

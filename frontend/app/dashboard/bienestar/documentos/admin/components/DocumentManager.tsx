@@ -269,7 +269,7 @@ export default function DocumentManager({
             placeholder="Buscar por título, descripción o autor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+            className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
           />
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -288,7 +288,7 @@ export default function DocumentManager({
               id="category-filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value === 'todas' ? 'todas' : parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
             >
               <option value="todas">Todas las categorías</option>
               {categories.map((category) => (
@@ -307,7 +307,7 @@ export default function DocumentManager({
               id="status-filter"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
             >
               <option value="todos">Todos los estados</option>
               {documentStates.map((state) => (
@@ -506,7 +506,7 @@ export default function DocumentManager({
                       required
                       value={formData.titulo}
                       onChange={(e) => handleFormChange('titulo', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                     />
                   </div>
 
@@ -520,7 +520,7 @@ export default function DocumentManager({
                       rows={3}
                       value={formData.descripcion}
                       onChange={(e) => handleFormChange('descripcion', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                     />
                   </div>
 
@@ -533,7 +533,7 @@ export default function DocumentManager({
                       id="edit-categoria"
                       value={formData.categoria_id}
                       onChange={(e) => handleFormChange('categoria_id', parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                     >
                       <option value={0}>Sin categoría</option>
                       {categories.map((category) => (
@@ -554,7 +554,7 @@ export default function DocumentManager({
                       id="edit-autor"
                       value={formData.autor}
                       onChange={(e) => handleFormChange('autor', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                     />
                   </div>
 
@@ -567,7 +567,7 @@ export default function DocumentManager({
                       id="edit-estado"
                       value={formData.estado}
                       onChange={(e) => handleFormChange('estado', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2e3954] focus:border-transparent text-gray-900"
                     >
                       {documentStates.map((state) => (
                         <option key={state.value} value={state.value}>

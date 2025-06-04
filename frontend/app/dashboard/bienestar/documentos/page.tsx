@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DocumentCard from './components/DocumentCard';
 import { Document, DocumentCategory, DocumentTag, DocumentFilters, DocumentView } from './types';
 import { documentsApi, categoriesApi, tagsApi, handleApiError } from './lib/api';
 import { useDocuments } from './context/DocumentsContext';
+import { useDocumentCache } from './hooks/useDocumentCache';
 
 export default function DocumentosPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   // Usar el contexto global de documentos
   const { 
@@ -20,13 +22,23 @@ export default function DocumentosPage() {
     refreshDocuments,
     isInitialized 
   } = useDocuments();
+
+  // Usar el hook de cache para URLs y visualización
+  const { 
+    getCachedFileUrl, 
+    getFileUrl, 
+    shouldShowPreview, 
+    getViewerType,
+    isLoading: isCacheLoading,
+    cacheSize 
+  } = useDocumentCache();
   
   // Estados locales para UI
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | number>('todas');
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<'kossodo' | 'kossomet' | 'grupo_kossodo' | 'todas'>('todas');
-  const [view, setView] = useState<DocumentView>('grid');
+  const [view, setView] = useState<DocumentView>('list');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // Estado para controlar descargas en progreso
@@ -35,6 +47,27 @@ export default function DocumentosPage() {
   // Nuevo estado para el documento seleccionado para visualizar
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [viewerMode, setViewerMode] = useState(false);
+
+  // Efecto para manejar parámetros URL (desde LatestDocuments)
+  useEffect(() => {
+    if (!searchParams) return;
+    
+    const viewDocumentId = searchParams.get('view');
+    const mode = searchParams.get('mode');
+    
+    if (viewDocumentId && mode === 'viewer' && documents.length > 0) {
+      const documentToView = documents.find(doc => doc.id === parseInt(viewDocumentId));
+      
+      if (documentToView && shouldShowPreview(documentToView)) {
+        setSelectedDocument(documentToView);
+        setViewerMode(true);
+        console.log('🔗 [URL] Abriendo documento desde parámetros URL:', documentToView.titulo);
+        
+        // Limpiar los parámetros URL después de procesar
+        router.replace('/dashboard/bienestar/documentos', { scroll: false });
+      }
+    }
+  }, [searchParams, documents, router, shouldShowPreview]);
 
   // Calcular categorías y etiquetas que tienen documentos
   const categoriesWithDocuments = useMemo(() => {
@@ -120,21 +153,6 @@ export default function DocumentosPage() {
     });
   };
 
-  // Función para obtener URL del archivo
-  const getFileUrl = (document: Document) => {
-    const filename = document.ruta_archivo.split('/').pop();
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-    return `${baseUrl}/api/bienestar/documentos/files/${encodeURIComponent(filename || '')}`;
-  };
-
-  // Función para determinar el tipo de visualización
-  const getViewerType = (mimeType: string) => {
-    if (mimeType.includes('pdf')) return 'pdf';
-    if (mimeType.includes('image')) return 'image';
-    if (mimeType.includes('text') || mimeType.includes('json')) return 'text';
-    return 'download';
-  };
-
   // Manejar cambio de categoría
   const handleCategoryChange = (categoryId: string | number) => {
     setSelectedCategory(categoryId);
@@ -162,10 +180,20 @@ export default function DocumentosPage() {
     setSelectedGroup('todas');
   };
 
-  // Manejar visualización de documento (MODIFICADO - ya no navega)
+  // Manejar visualización de documento (MODIFICADO - solo para PDFs e imágenes)
   const handleView = (document: Document) => {
-    setSelectedDocument(document);
-    setViewerMode(true);
+    const viewerType = getViewerType(document);
+    
+    // Solo mostrar preview para PDFs e imágenes
+    if (viewerType === 'pdf' || viewerType === 'image') {
+      setSelectedDocument(document);
+      setViewerMode(true);
+      console.log(`🔍 [VIEW] Abriendo preview para documento ${document.id} (${viewerType})`);
+    } else {
+      // Para otros tipos, descargar directamente
+      console.log(`📥 [VIEW] Descarga directa para documento ${document.id} (${viewerType})`);
+      handleDownload(document);
+    }
   };
 
   // Función para volver a la lista de documentos
@@ -179,7 +207,7 @@ export default function DocumentosPage() {
     setDownloadingDocuments(prev => new Set(prev.add(document.id)));
     
     try {
-      console.log('Descargando documento:', document.titulo);
+      console.log('📥 [DOWNLOAD] Descargando documento:', document.titulo);
       const blob = await documentsApi.downloadDocument(document.id);
       
       const url = window.URL.createObjectURL(blob);
@@ -193,7 +221,7 @@ export default function DocumentosPage() {
       window.document.body.removeChild(link);
       
     } catch (error) {
-      console.error('Error al descargar documento:', error);
+      console.error('❌ [DOWNLOAD] Error al descargar documento:', error);
       alert('Error al descargar el documento');
     } finally {
       setDownloadingDocuments(prev => {
@@ -206,28 +234,36 @@ export default function DocumentosPage() {
 
   // Manejar edición de documento
   const handleEdit = (document: Document) => {
-    console.log('Editando documento:', document.titulo);
+    console.log('✏️ [EDIT] Editando documento:', document.titulo);
   };
 
   // Manejar eliminación de documento
   const handleDelete = (document: Document) => {
     if (confirm(`¿Estás seguro de que deseas eliminar "${document.titulo}"?`)) {
-      console.log('Eliminando documento:', document.titulo);
+      console.log('🗑️ [DELETE] Eliminando documento:', document.titulo);
     }
   };
 
-  // Renderizar el viewer de documento
+  // Renderizar el viewer de documento SIMPLIFICADO
   const renderDocumentViewer = () => {
     if (!selectedDocument) return null;
 
-    const viewerType = getViewerType(selectedDocument.tipo_mime);
+    const viewerType = getViewerType(selectedDocument);
     
-    // Renderizar PDF
+    // Renderizar PDF con cache
     const renderPDFViewer = () => {
       const pdfUrl = `${getFileUrl(selectedDocument)}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH`;
       
       return (
-        <div className="h-full bg-gray-50 rounded-lg">
+        <div className="h-full bg-gray-50 rounded-lg relative">
+          {isCacheLoading(selectedDocument.id) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-90 z-10">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2e3954] mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Validando PDF...</p>
+              </div>
+            </div>
+          )}
           <iframe
             src={pdfUrl}
             className="w-full h-full rounded-lg"
@@ -237,49 +273,28 @@ export default function DocumentosPage() {
       );
     };
 
-    // Renderizar imagen
+    // Renderizar imagen con cache
     const renderImageViewer = () => {
       const imageUrl = getFileUrl(selectedDocument);
       
       return (
-        <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
+        <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg relative">
+          {isCacheLoading(selectedDocument.id) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-90 z-10">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2e3954] mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Validando imagen...</p>
+              </div>
+            </div>
+          )}
           <div className="max-w-4xl max-h-full relative">
             <img
               src={imageUrl}
               alt={selectedDocument.titulo}
               className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+              onLoad={() => console.log(`✅ [IMAGE] Imagen cargada: ${selectedDocument.id}`)}
+              onError={() => console.error(`❌ [IMAGE] Error cargando imagen: ${selectedDocument.id}`)}
             />
-          </div>
-        </div>
-      );
-    };
-
-    // Renderizar vista de descarga para otros tipos
-    const renderDownloadViewer = () => {
-      const getFileIcon = (mimeType: string): string => {
-        if (mimeType.includes('pdf')) return '📄';
-        if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
-        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
-        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return '📈';
-        if (mimeType.includes('zip') || mimeType.includes('rar')) return '🗜️';
-        return '📎';
-      };
-
-      return (
-        <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
-          <div className="text-center p-8">
-            <div className="text-6xl mb-4">{getFileIcon(selectedDocument.tipo_mime)}</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">{selectedDocument.titulo}</h3>
-            <p className="text-gray-600 mb-4">Este tipo de archivo no se puede previsualizar</p>
-            <button
-              onClick={() => handleDownload(selectedDocument)}
-              className="px-6 py-3 bg-[#2e3954] text-white rounded-lg hover:bg-[#1e2633] transition-colors flex items-center space-x-2 mx-auto"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Descargar archivo</span>
-            </button>
           </div>
         </div>
       );
@@ -295,6 +310,7 @@ export default function DocumentosPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">{selectedDocument.titulo}</h2>
                 <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                   <span><strong>Autor:</strong> {selectedDocument.autor || 'No especificado'}</span>
+                  <span><strong>Tipo:</strong> {getViewerType(selectedDocument).toUpperCase()}</span>
                   <span><strong>Tamaño:</strong> {formatFileSize(selectedDocument.tamaño_archivo)}</span>
                   <span><strong>Descargas:</strong> {selectedDocument.descargas}</span>
                   <span><strong>Subido:</strong> {formatDate(selectedDocument.created_at)}</span>
@@ -321,7 +337,6 @@ export default function DocumentosPage() {
           <div className="flex-1 relative">
             {viewerType === 'pdf' && renderPDFViewer()}
             {viewerType === 'image' && renderImageViewer()}
-            {viewerType === 'download' && renderDownloadViewer()}
           </div>
         </div>
       </div>
@@ -334,6 +349,9 @@ export default function DocumentosPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2e3954] mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando documentos...</p>
+          {cacheSize > 0 && (
+            <p className="text-xs text-gray-500 mt-1">Cache: {cacheSize} URLs</p>
+          )}
         </div>
       </div>
     );
@@ -349,15 +367,22 @@ export default function DocumentosPage() {
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                  title="Cerrar filtros"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center space-x-2">
+                  {cacheSize > 0 && (
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                      Cache: {cacheSize}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                    title="Cerrar filtros"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Búsqueda */}
@@ -553,6 +578,9 @@ export default function DocumentosPage() {
                   ? `Visualizando: ${selectedDocument?.titulo}`
                   : `${filteredDocuments.length} documento(s) encontrado(s)`
                 }
+                {cacheSize > 0 && !viewerMode && (
+                  <span className="ml-2 text-xs text-green-600">• Cache: {cacheSize} URLs</span>
+                )}
               </p>
             </div>
           </div>

@@ -3,6 +3,7 @@
 import React from 'react';
 import FeaturedPostsSlider from './FeaturedPostsSlider';
 import RecentPostsGrid from './RecentPostsGrid';
+import LatestDocuments from './LatestDocuments';
 // import { PostsProvider } from '../../app/dashboard/bienestar/context/PostsContext'; // Eliminado
 // import { NotificationsProvider } from '../../app/dashboard/bienestar/context/NotificationsContext'; // Eliminado
 // import { clearStorage, initializeStorage } from '../../lib/bienestar/storage'; // Comentado: Ya no se usa directamente aquí
@@ -56,10 +57,41 @@ export default function BienestarPosts({
             */}
           </div>
           
-          {/* Sección de posts destacados */}
+          {/* Sección principal: Títulos distribuidos 75-25 */}
           <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-[#2e3954] mb-4">{featuredTitle}</h2>
-            <FeaturedPostsSlider maxPosts={maxFeatured} />
+            {/* Fila de títulos distribuida 75-25 */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-4">
+              {/* Título "Destacados" - 75% */}
+              <div className="lg:col-span-3">
+                <h2 className="text-2xl font-semibold text-[#2e3954]">{featuredTitle}</h2>
+              </div>
+              
+              {/* Título "Últimos Documentos" + Ver más - 25% */}
+              <div className="lg:col-span-1">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-[#2e3954]">Últimos Documentos</h3>
+                  <button
+                    onClick={() => window.location.href = '/dashboard/bienestar/documentos'}
+                    className="text-sm text-[#2e3954] hover:text-[#1e2633] font-medium transition-colors"
+                  >
+                    Ver más
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Fila de contenido distribuida 75-25 */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Banner - 75% (3 columnas) */}
+              <div className="lg:col-span-3">
+                <FeaturedPostsSlider maxPosts={maxFeatured} />
+              </div>
+              
+              {/* Lista de Documentos - 25% (1 columna) - SIN header interno */}
+              <div className="lg:col-span-1">
+                <LatestDocuments maxDocuments={5} showHeader={false} />
+              </div>
+            </div>
           </div>
           
           {/* Sección de posts recientes */}
