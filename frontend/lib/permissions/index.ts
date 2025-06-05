@@ -24,4 +24,11 @@ export {
   useDocumentsPermissions,
   DOCUMENTS_PERMISSIONS,
   checkDocumentPermission
-} from './documentsPermissions'; 
+} from './documentsPermissions';
+
+// Permisos específicos de catálogos
+export { 
+  useCatalogosPermissions,
+  CATALOGOS_PERMISSIONS,
+  checkCatalogoPermission
+} from './catalogosPermissions'; 

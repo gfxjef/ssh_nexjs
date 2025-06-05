@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useCatalogosPermissions } from '@/lib/permissions';
 
 // Define la URL base de tu backend Flask usando la variable de entorno
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'; 
@@ -17,6 +18,17 @@ interface CatalogoFromAPI {
 }
 
 export default function Catalogos() {
+  // Hook de permisos
+  const {
+    canAddCatalogos,
+    canUpdateCatalogos,
+    canDeleteCatalogos,
+    canDownloadCatalogos,
+    canShareCatalogos,
+    canReportCatalogos,
+    canViewCatalogos
+  } = useCatalogosPermissions();
+
   // Estados
   const [catalogos, setCatalogos] = useState<CatalogoFromAPI[]>([]);
   const [catalogosFiltrados, setCatalogosFiltrados] = useState<CatalogoFromAPI[]>([]);
@@ -329,6 +341,11 @@ export default function Catalogos() {
     window.open(uploadUrl, '_blank');
   };
 
+  // Verificar permisos de acceso
+  if (!canViewCatalogos()) {
+    return <div className="container mx-auto px-4 py-8 text-center text-red-500">No tienes permisos para acceder a esta sección.</div>;
+  }
+
   if (isLoading) {
     return <div className="container mx-auto px-4 py-8 text-center">Cargando catálogos...</div>;
   }
@@ -361,17 +378,19 @@ export default function Catalogos() {
                 </svg>
               </button>
             </div>
-            <button 
-              onClick={irAPaginaDeSubida}
-              title="Añadir nuevo catálogo"
-              className="p-2 bg-[#2e3954] text-white rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center aspect-square"
-              style={{ width: '40px', height: '40px' }} // Asegura que sea un círculo si es redondo
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
+            {canAddCatalogos() && (
+              <button 
+                onClick={irAPaginaDeSubida}
+                title="Añadir nuevo catálogo"
+                className="p-2 bg-[#2e3954] text-white rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center aspect-square"
+                style={{ width: '40px', height: '40px' }} // Asegura que sea un círculo si es redondo
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         
@@ -422,23 +441,25 @@ export default function Catalogos() {
                 {/* Botones de acción */}
                 <div className="flex flex-col gap-3 w-full md:w-auto">
                   {/* Primera fila de botones */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button 
-                      onClick={() => descargarPdf(catalogo)}
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
-                      title="Descargar PDF Original"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                      <span className="text-xs md:text-sm hidden md:inline text-gray-800">Descargar</span>
-                    </button>
+                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                    {canDownloadCatalogos() && (
+                      <button 
+                        onClick={() => descargarPdf(catalogo)}
+                        className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors min-w-0 px-2 py-1"
+                        title="Descargar PDF Original"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span className="text-xs md:text-sm hidden md:inline text-gray-800">Descargar</span>
+                      </button>
+                    )}
                     
                     <button 
                       onClick={() => verPdf(catalogo)}
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
+                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors min-w-0 px-2 py-1"
                       title="Ver PDF en el visualizador"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -448,56 +469,64 @@ export default function Catalogos() {
                       <span className="text-xs md:text-sm hidden md:inline text-gray-800">Ver PDF</span>
                     </button>
                     
-                    <button 
-                      onClick={() => compartirCatalogo(catalogo)}
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
-                      title="Copiar enlace para ver PDF"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                      </svg>
-                      <span className="text-xs md:text-sm hidden md:inline text-gray-800">Enviar</span>
-                    </button>
+                    {canShareCatalogos() && (
+                                              <button 
+                        onClick={() => compartirCatalogo(catalogo)}
+                        className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors min-w-0 px-2 py-1"
+                        title="Copiar enlace para ver PDF"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="22" y1="2" x2="11" y2="13"></line>
+                          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                        <span className="text-xs md:text-sm hidden md:inline text-gray-800">Enviar</span>
+                      </button>
+                    )}
                   </div>
                   
                   {/* Segunda fila de botones */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button 
-                      onClick={() => eliminarCatalogo(catalogo)}
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-red-500 transition-colors"
-                      title="Eliminar Catálogo del Servidor"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                      <span className="text-xs md:text-sm hidden md:inline text-gray-800">Eliminar</span>
-                    </button>
+                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                    {canDeleteCatalogos() && (
+                                              <button 
+                        onClick={() => eliminarCatalogo(catalogo)}
+                        className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-red-500 transition-colors min-w-0 px-2 py-1"
+                        title="Eliminar Catálogo del Servidor"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        <span className="text-xs md:text-sm hidden md:inline text-gray-800">Eliminar</span>
+                      </button>
+                    )}
                     
-                    <button 
-                      onClick={() => actualizarCatalogo(catalogo)} // Pasa el objeto catálogo completo
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
-                      title="Actualizar Catálogo (subir nueva versión)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
-                      </svg>
-                      <span className="text-xs md:text-sm hidden md:inline text-gray-800">Actualizar</span>
-                    </button>
+                    {canUpdateCatalogos() && (
+                                              <button 
+                        onClick={() => actualizarCatalogo(catalogo)} // Pasa el objeto catálogo completo
+                        className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors min-w-0 px-2 py-1"
+                        title="Actualizar Catálogo (subir nueva versión)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
+                        </svg>
+                        <span className="text-xs md:text-sm hidden md:inline text-gray-800">Actualizar</span>
+                      </button>
+                    )}
                     
-                    <button 
-                      onClick={() => abrirModalReporte(catalogo)} // Pasa el objeto catálogo completo
-                      className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors"
-                      title="Reportar Problema con este PDF"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                      <span className="text-xs md:text-sm hidden md:inline text-gray-800">Reportar</span>
-                    </button>
+                    {canReportCatalogos() && (
+                                              <button 
+                        onClick={() => abrirModalReporte(catalogo)} // Pasa el objeto catálogo completo
+                        className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 text-gray-700 hover:text-[#d48b45] transition-colors min-w-0 px-2 py-1"
+                        title="Reportar Problema con este PDF"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                          <line x1="12" y1="9" x2="12" y2="13"></line>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span className="text-xs md:text-sm hidden md:inline text-gray-800">Reportar</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

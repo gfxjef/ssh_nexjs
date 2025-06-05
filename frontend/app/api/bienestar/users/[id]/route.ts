@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://192.168.18.26:3001';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     const response = await fetch(`${BACKEND_URL}/api/bienestar/users/${id}`);
     const data = await response.json();
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     
     const response = await fetch(`${BACKEND_URL}/api/bienestar/users/${id}`, {

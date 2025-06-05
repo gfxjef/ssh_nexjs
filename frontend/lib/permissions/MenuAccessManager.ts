@@ -54,6 +54,15 @@ export class MenuAccessManager {
         'edit-post': ['admin', 'rrhh'],
         'delete-post': ['admin'],
         
+        // Permisos para catálogos
+        'catalogos.delete': ['admin'],
+        'catalogos.update': ['admin'],
+        'catalogos.add': ['admin'],
+        'catalogos.view': ['admin', 'gerente', 'vendedor', 'asesor', 'marketing', 'rrhh'],
+        'catalogos.download': ['admin', 'gerente', 'vendedor', 'asesor', 'marketing', 'rrhh'],
+        'catalogos.share': ['admin', 'gerente', 'vendedor', 'asesor', 'marketing', 'rrhh'],
+        'catalogos.report': ['admin', 'gerente', 'vendedor', 'asesor', 'marketing', 'rrhh'],
+        
         // Permisos para documentos
         'documents.view': ['admin', 'gerente', 'rrhh', 'atencion'],
         'documents.upload': ['admin', 'rrhh', 'atencion'],

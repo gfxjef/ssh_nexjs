@@ -18,12 +18,23 @@ interface PostFormProps {
   post?: Post;
   onClose: () => void;
   isEditMode?: boolean;
+  onPreview?: (previewData: {
+    titulo: string;
+    extracto: string;
+    contenido: string;
+    imagenUrl: string;
+    autor: string;
+    fecha: string;
+    categoria: string;
+    categoriaColor?: string;
+    destacado: boolean;
+  }) => void;
 }
 
 /**
  * Componente de formulario para crear y editar posts con Summernote
  */
-export default function PostForm({ post, onClose, isEditMode = false }: PostFormProps) {
+export default function PostForm({ post, onClose, isEditMode = false, onPreview }: PostFormProps) {
   const { addPost, updatePost, getCategories } = usePosts();
   const categories = getCategories();
   
@@ -137,6 +148,29 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
     // No actualizamos el estado `contenido` de React aquí para evitar re-renderizados
     // que reinicien el editor. El valor se obtiene de la ref al hacer submit.
     console.log('Summernote internal onChange. New content provided:', newContent ? newContent.substring(0,50) + '...' : 'empty');
+  };
+
+  // Función para manejar la previsualización
+  const handlePreview = () => {
+    if (!onPreview) return;
+    
+    // Obtener el contenido actual del editor
+    const contenidoActual = summernoteRef.current ? summernoteRef.current.summernote('code') : contenido;
+    const selectedCategory = categories.find(cat => cat.id === categoriaId);
+    
+    const previewData = {
+      titulo,
+      extracto,
+      contenido: contenidoActual,
+      imagenUrl,
+      autor,
+      fecha,
+      categoria: selectedCategory?.nombre || '',
+      categoriaColor: selectedCategory?.color,
+      destacado
+    };
+    
+    onPreview(previewData);
   };
 
   // Función para manejar la subida de imágenes destacadas (input file)
@@ -441,6 +475,20 @@ export default function PostForm({ post, onClose, isEditMode = false }: PostForm
         >
           Cancelar
         </button>
+        {onPreview && (
+          <button
+            type="button"
+            onClick={handlePreview}
+            className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 rounded-lg font-medium text-white transition flex items-center"
+            disabled={loading}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+            </svg>
+            Previsualizar
+          </button>
+        )}
         <button
           type="submit"
           className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded-lg font-medium text-white transition"

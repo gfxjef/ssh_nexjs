@@ -6,6 +6,7 @@ import { Postulante, getPostulantesByPostId } from '../../../../lib/api/bienesta
 import { usePosts } from '../context/PostsContext';
 import { useNotifications } from '../context/NotificationsContext';
 import PostForm from '../../../../components/bienestar/PostForm';
+import PostPreview from '../../../../components/bienestar/PostPreview';
 import CategoryBadge from '../../../../components/bienestar/CategoryBadge';
 import Notifications from '../../../../components/bienestar/Notifications';
 import { PermissionButton, WithPermission, usePermissions } from '@/lib/permissions';
@@ -24,6 +25,20 @@ export default function AdminPosts() {
   const [postSeleccionadoParaVerPostulantes, setPostSeleccionadoParaVerPostulantes] = useState<Post | null>(null);
   const [postulantesList, setPostulantesList] = useState<Postulante[]>([]);
   const [loadingPostulantes, setLoadingPostulantes] = useState<boolean>(false);
+  
+  // Estados para el modal de preview
+  const [modalPreviewAbierto, setModalPreviewAbierto] = useState<boolean>(false);
+  const [previewData, setPreviewData] = useState<{
+    titulo: string;
+    extracto: string;
+    contenido: string;
+    imagenUrl: string;
+    autor: string;
+    fecha: string;
+    categoria: string;
+    categoriaColor?: string;
+    destacado: boolean;
+  } | null>(null);
   
   // Obtener los datos y funciones del contexto
   const { 
@@ -156,6 +171,27 @@ export default function AdminPosts() {
     setPostSeleccionadoParaVerPostulantes(null);
     setPostulantesList([]);
     setLoadingPostulantes(false);
+  };
+
+  // Funciones para manejar el modal de preview
+  const abrirModalPreview = (data: {
+    titulo: string;
+    extracto: string;
+    contenido: string;
+    imagenUrl: string;
+    autor: string;
+    fecha: string;
+    categoria: string;
+    categoriaColor?: string;
+    destacado: boolean;
+  }) => {
+    setPreviewData(data);
+    setModalPreviewAbierto(true);
+  };
+
+  const cerrarModalPreview = () => {
+    setModalPreviewAbierto(false);
+    setPreviewData(null);
   };
 
   return (
@@ -595,6 +631,7 @@ export default function AdminPosts() {
                 post={postSeleccionado || undefined}
                 onClose={cerrarModal}
                 isEditMode={modoEdicion}
+                onPreview={abrirModalPreview}
               />
             </div>
           </div>
@@ -682,6 +719,41 @@ export default function AdminPosts() {
                 >
                   Cerrar
                 </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Preview del Post */}
+      {modalPreviewAbierto && previewData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
+              <h2 className="text-xl font-bold text-[#2e3954]">
+                Vista Previa del Post
+              </h2>
+              <button
+                onClick={cerrarModalPreview}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+              <PostPreview
+                titulo={previewData.titulo}
+                extracto={previewData.extracto}
+                contenido={previewData.contenido}
+                imagenUrl={previewData.imagenUrl}
+                autor={previewData.autor}
+                fecha={previewData.fecha}
+                categoria={previewData.categoria}
+                categoriaColor={previewData.categoriaColor}
+                destacado={previewData.destacado}
+              />
             </div>
           </div>
         </div>

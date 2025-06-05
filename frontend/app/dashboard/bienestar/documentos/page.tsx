@@ -232,17 +232,7 @@ export default function DocumentosPage() {
     }
   };
 
-  // Manejar edición de documento
-  const handleEdit = (document: Document) => {
-    console.log('✏️ [EDIT] Editando documento:', document.titulo);
-  };
 
-  // Manejar eliminación de documento
-  const handleDelete = (document: Document) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar "${document.titulo}"?`)) {
-      console.log('🗑️ [DELETE] Eliminando documento:', document.titulo);
-    }
-  };
 
   // Renderizar el viewer de documento SIMPLIFICADO
   const renderDocumentViewer = () => {
@@ -641,8 +631,6 @@ export default function DocumentosPage() {
                     view="grid"
                     onView={handleView}
                     onDownload={handleDownload}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
                     isDownloading={downloadingDocuments.has(document.id)}
                   />
                 ))}
@@ -656,8 +644,6 @@ export default function DocumentosPage() {
                     view="list"
                     onView={handleView}
                     onDownload={handleDownload}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
                     isDownloading={downloadingDocuments.has(document.id)}
                   />
                 ))}
